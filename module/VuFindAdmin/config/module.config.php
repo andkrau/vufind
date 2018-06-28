@@ -3,19 +3,25 @@ namespace VuFindAdmin\Module\Configuration;
 
 $config = [
     'controllers' => [
-        'invokables' => [
-            'admin' => 'VuFindAdmin\Controller\AdminController',
-            'adminconfig' => 'VuFindAdmin\Controller\ConfigController',
-            'adminsocial' => 'VuFindAdmin\Controller\SocialstatsController',
-            'adminmaintenance' => 'VuFindAdmin\Controller\MaintenanceController',
-            'adminstatistics' => 'VuFindAdmin\Controller\StatisticsController',
-            'admintags' => 'VuFindAdmin\Controller\TagsController',
+        'factories' => [
+            'VuFindAdmin\Controller\AdminController' => 'VuFind\Controller\AbstractBaseFactory',
+            'VuFindAdmin\Controller\ConfigController' => 'VuFind\Controller\AbstractBaseFactory',
+            'VuFindAdmin\Controller\MaintenanceController' => 'VuFind\Controller\AbstractBaseFactory',
+            'VuFindAdmin\Controller\SocialstatsController' => 'VuFind\Controller\AbstractBaseFactory',
+            'VuFindAdmin\Controller\TagsController' => 'VuFind\Controller\AbstractBaseFactory',
+        ],
+        'aliases' => [
+            'Admin' => 'VuFindAdmin\Controller\AdminController',
+            'AdminConfig' => 'VuFindAdmin\Controller\ConfigController',
+            'AdminMaintenance' => 'VuFindAdmin\Controller\MaintenanceController',
+            'AdminSocial' => 'VuFindAdmin\Controller\SocialstatsController',
+            'AdminTags' => 'VuFindAdmin\Controller\TagsController',
         ],
     ],
     'router' => [
         'routes' => [
             'admin' => [
-                'type' => 'Zend\Mvc\Router\Http\Literal',
+                'type' => 'Zend\Router\Http\Literal',
                 'options' => [
                     'route'    => '/Admin',
                     'defaults' => [
@@ -26,7 +32,7 @@ $config = [
                 'may_terminate' => true,
                 'child_routes' => [
                     'disabled' => [
-                        'type' => 'Zend\Mvc\Router\Http\Literal',
+                        'type' => 'Zend\Router\Http\Literal',
                         'options' => [
                             'route'    => '/Disabled',
                             'defaults' => [
@@ -36,7 +42,7 @@ $config = [
                         ]
                     ],
                     'config' => [
-                        'type' => 'Zend\Mvc\Router\Http\Segment',
+                        'type' => 'Zend\Router\Http\Segment',
                         'options' => [
                             'route'    => '/Config[/:action]',
                             'defaults' => [
@@ -46,7 +52,7 @@ $config = [
                         ]
                     ],
                     'maintenance' => [
-                        'type' => 'Zend\Mvc\Router\Http\Segment',
+                        'type' => 'Zend\Router\Http\Segment',
                         'options' => [
                             'route'    => '/Maintenance[/:action]',
                             'defaults' => [
@@ -56,7 +62,7 @@ $config = [
                         ]
                     ],
                     'social' => [
-                        'type' => 'Zend\Mvc\Router\Http\Segment',
+                        'type' => 'Zend\Router\Http\Segment',
                         'options' => [
                             'route'    => '/Social[/:action]',
                             'defaults' => [
@@ -65,18 +71,8 @@ $config = [
                             ]
                         ]
                     ],
-                    'statistics' => [
-                        'type' => 'Zend\Mvc\Router\Http\Segment',
-                        'options' => [
-                            'route'    => '/Statistics[/:action]',
-                            'defaults' => [
-                                'controller' => 'AdminStatistics',
-                                'action'     => 'Home',
-                            ]
-                        ]
-                    ],
                     'tags' => [
-                        'type' => 'Zend\Mvc\Router\Http\Segment',
+                        'type' => 'Zend\Router\Http\Segment',
                         'options' => [
                             'route'    => '/Tags[/:action]',
                             'defaults' => [

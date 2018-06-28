@@ -2,7 +2,7 @@
 /**
  * Config SearchSpecsReader Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +26,9 @@
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 namespace VuFindTest\Config;
-use VuFind\Config\Locator, VuFind\Config\SearchSpecsReader;
+
+use VuFind\Config\Locator;
+use VuFind\Config\SearchSpecsReader;
 
 /**
  * Config SearchSpecsReader Test Class
@@ -65,9 +67,9 @@ class SearchSpecsReaderTest extends \VuFindTest\Unit\TestCase
         $parentPath = Locator::getLocalConfigPath('top.yaml', null, true);
         $parent = "top: foo";
         $childPath = Locator::getLocalConfigPath('middle.yaml', null, true);
-        $child = "@parent_yaml: $parentPath\nmiddle: bar";
+        $child = "\"@parent_yaml\": $parentPath\nmiddle: bar";
         $grandchildPath = Locator::getLocalConfigPath('bottom.yaml', null, true);
-        $grandchild = "@parent_yaml: $childPath\nbottom: baz";
+        $grandchild = "\"@parent_yaml\": $childPath\nbottom: baz";
 
         // Fail if we are unable to write files:
         if (null === $parentPath || null === $childPath || null === $grandchildPath
@@ -92,7 +94,7 @@ class SearchSpecsReaderTest extends \VuFindTest\Unit\TestCase
     {
         // The searchspecs.yaml file should define author dismax fields (among many
         // other things).
-        $reader = $this->getServiceManager()->get('VuFind\SearchSpecsReader');
+        $reader = $this->getServiceManager()->get('VuFind\Config\SearchSpecsReader');
         $specs = $reader->get('searchspecs.yaml');
         $this->assertTrue(
             isset($specs['Author']['DismaxFields'])
@@ -107,7 +109,7 @@ class SearchSpecsReaderTest extends \VuFindTest\Unit\TestCase
      */
     public function testMissingFileRead()
     {
-        $reader = $this->getServiceManager()->get('VuFind\SearchSpecsReader');
+        $reader = $this->getServiceManager()->get('VuFind\Config\SearchSpecsReader');
         $specs = $reader->get('notreallyasearchspecs.yaml');
         $this->assertEquals([], $specs);
     }

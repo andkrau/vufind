@@ -2,7 +2,7 @@
 /**
  * Solr Authority aspect of the Search Multi-class (Options)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -48,6 +48,17 @@ class Options extends \VuFind\Search\Solr\Options
         $this->facetsIni = $this->searchIni = 'authority';
         parent::__construct($configLoader);
         $this->spellcheck = false;
+    }
+
+    /**
+     * Return the route name for the facet list action. Returns false to cover
+     * unimplemented support.
+     *
+     * @return string|bool
+     */
+    public function getFacetListAction()
+    {
+        return 'authority-facetlist';
     }
 
     /**

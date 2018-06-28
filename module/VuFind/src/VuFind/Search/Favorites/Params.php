@@ -2,7 +2,7 @@
 /**
  * Favorites aspect of the Search Multi-class (Params)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -38,17 +38,6 @@ namespace VuFind\Search\Favorites;
  */
 class Params extends \VuFind\Search\Base\Params
 {
-    /**
-     * Constructor
-     *
-     * @param \VuFind\Search\Base\Options  $options      Options to use
-     * @param \VuFind\Config\PluginManager $configLoader Config loader
-     */
-    public function __construct($options, \VuFind\Config\PluginManager $configLoader)
-    {
-        parent::__construct($options, $configLoader);
-    }
-
     /**
      * Add filters to the object based on values found in the request object.
      *

@@ -3,7 +3,7 @@
 /**
  * Unit tests for Amazon cover loader.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -27,6 +27,7 @@
  * @link     https://vufind.org
  */
 namespace VuFindTest\Content\Covers;
+
 use VuFindCode\ISBN;
 
 /**
@@ -38,7 +39,7 @@ use VuFindCode\ISBN;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org
  */
-class AmazonTest extends \PHPUnit_Framework_TestCase
+class AmazonTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Amazon parameters
@@ -107,10 +108,10 @@ class AmazonTest extends \PHPUnit_Framework_TestCase
      */
     protected function getUrl($size, $isbn = '0739313126', $throw = false)
     {
-        $amazon = $this->getMock(
-            'VuFind\Content\Covers\Amazon', ['getAmazonService'],
-            ['fake', 'fakesecret']
-        );
+        $amazon = $this->getMockBuilder(__NAMESPACE__ . '\CoverAmazonMock')
+            ->setMethods(['getAmazonService'])
+            ->setConstructorArgs(['fake', 'fakesecret'])
+            ->getMock();
         $params = [];
         if (!empty($isbn)) {
             $behavior = $throw
@@ -134,10 +135,10 @@ class AmazonTest extends \PHPUnit_Framework_TestCase
      */
     protected function getFakeService($isbn, $expectedBehavior)
     {
-        $service = $this->getMock(
-            'ZendService\Amazon\Amazon', ['itemLookup'],
-            ['fakekey', 'US', 'fakesecret']
-        );
+        $service = $this->getMockBuilder(__NAMESPACE__ . '\ZendAmazonMock')
+            ->setMethods(['itemLookup'])
+            ->setConstructorArgs(['fakekey', 'US', 'fakesecret'])
+            ->getMock();
         if (!empty($isbn)) {
             $service->expects($this->once())
                 ->method('itemLookup')
@@ -156,5 +157,19 @@ class AmazonTest extends \PHPUnit_Framework_TestCase
     {
         $file = realpath(__DIR__ . '/../../../../../fixtures/content/amazon-cover');
         return unserialize(file_get_contents($file));
+    }
+}
+
+class CoverAmazonMock extends \VuFind\Content\Covers\Amazon
+{
+    public function getAmazonService($key)
+    {
+    }
+}
+
+class ZendAmazonMock extends \ZendService\Amazon\Amazon
+{
+    public function itemLookup($asin, array $options = [])
+    {
     }
 }

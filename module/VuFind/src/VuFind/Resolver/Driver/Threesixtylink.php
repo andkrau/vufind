@@ -2,7 +2,7 @@
 /**
  * 360Link Link Resolver Driver
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Royal Holloway, University of London
  *
@@ -28,7 +28,9 @@
  * @link     https://vufind.org/wiki/development:plugins:link_resolver_drivers Wiki
  */
 namespace VuFind\Resolver\Driver;
-use DOMDocument, DOMXpath;
+
+use DOMDocument;
+use DOMXpath;
 
 /**
  * 360Link Link Resolver Driver
@@ -39,15 +41,8 @@ use DOMDocument, DOMXpath;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:link_resolver_drivers Wiki
  */
-class Threesixtylink implements DriverInterface
+class Threesixtylink extends AbstractBase
 {
-    /**
-     * Base URL for link resolver
-     *
-     * @var string
-     */
-    protected $baseUrl;
-
     /**
      * HTTP client
      *
@@ -63,7 +58,7 @@ class Threesixtylink implements DriverInterface
      */
     public function __construct($baseUrl, \Zend\Http\Client $httpClient)
     {
-        $this->baseUrl = $baseUrl;
+        parent::__construct($baseUrl);
         $this->httpClient = $httpClient;
     }
 
@@ -106,7 +101,7 @@ class Threesixtylink implements DriverInterface
 
         $xpath = new DOMXpath($xml);
         $linkGroups = $xpath->query("//ssopenurl:linkGroup[@type='holding']");
-        if (!is_null($linkGroups)) {
+        if (null !== $linkGroups) {
             foreach ($linkGroups as $linkGroup) {
                 $record = [];
                 // select the deepest link returned

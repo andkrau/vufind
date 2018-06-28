@@ -2,7 +2,7 @@
 /**
  * Mink link resolver test class.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2016.
  *
@@ -26,6 +26,7 @@
  * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\Mink;
+
 use Behat\Mink\Element\Element;
 
 /**
@@ -154,9 +155,10 @@ class LinkResolverTest extends \VuFindTest\Unit\MinkTestCase
         $session = $this->getMinkSession();
         $session->visit($this->getVuFindUrl() . '/Search/Home');
         $page = $session->getPage();
-        $this->findCss($page, '.searchForm [name="lookfor"]')
+        $this->findCss($page, '#searchForm_lookfor')
             ->setValue('id:testsample1');
         $this->findCss($page, '.btn.btn-primary')->click();
+        $this->snooze();
 
         // Verify the OpenURL
         $this->assertOpenUrl($page);
@@ -182,7 +184,7 @@ class LinkResolverTest extends \VuFindTest\Unit\MinkTestCase
         $session = $this->getMinkSession();
         $session->visit($this->getVuFindUrl() . '/Search/Home');
         $page = $session->getPage();
-        $this->findCss($page, '.searchForm [name="lookfor"]')
+        $this->findCss($page, '#searchForm_lookfor')
             ->setValue('id:testsample1');
         $this->findCss($page, '.btn.btn-primary')->click();
 

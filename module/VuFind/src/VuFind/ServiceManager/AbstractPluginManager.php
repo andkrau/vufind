@@ -2,7 +2,7 @@
 /**
  * VuFind Plugin Manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,9 +26,9 @@
  * @link     https://vufind.org/wiki/development Wiki
  */
 namespace VuFind\ServiceManager;
-use Zend\ServiceManager\AbstractPluginManager as Base,
-    Zend\ServiceManager\ConfigInterface,
-    Zend\ServiceManager\Exception\RuntimeException as ServiceManagerRuntimeException;
+
+use Zend\ServiceManager\AbstractPluginManager as Base;
+use Zend\ServiceManager\Exception\InvalidServiceException;
 
 /**
  * VuFind Plugin Manager
@@ -43,18 +43,23 @@ use Zend\ServiceManager\AbstractPluginManager as Base,
  */
 abstract class AbstractPluginManager extends Base
 {
+    use LowerCaseServiceNameTrait;
+
     /**
      * Constructor
      *
-     * Make sure table gateways are properly initialized.
+     * Make sure plugins are properly initialized.
      *
-     * @param ConfigInterface $configuration Configuration settings (optional)
+     * @param mixed $configOrContainerInstance Configuration or container instance
+     * @param array $v3config                  If $configOrContainerInstance is a
+     * container, this value will be passed to the parent constructor.
      */
-    public function __construct(ConfigInterface $configuration = null)
-    {
-        parent::__construct($configuration);
+    public function __construct($configOrContainerInstance = null,
+        array $v3config = []
+    ) {
+        parent::__construct($configOrContainerInstance, $v3config);
         $this->addInitializer(
-            ['VuFind\ServiceManager\Initializer', 'initPlugin'], false
+            'VuFind\ServiceManager\ServiceInitializer', false
         );
     }
 
@@ -66,14 +71,14 @@ abstract class AbstractPluginManager extends Base
      *
      * @param mixed $plugin Plugin to validate
      *
-     * @throws ServiceManagerRuntimeException if invalid
+     * @throws InvalidServiceException if invalid
      * @return void
      */
-    public function validatePlugin($plugin)
+    public function validate($plugin)
     {
         $expectedInterface = $this->getExpectedInterface();
-        if (!($plugin instanceof $expectedInterface)) {
-            throw new ServiceManagerRuntimeException(
+        if (!$plugin instanceof $expectedInterface) {
+            throw new InvalidServiceException(
                 'Plugin ' . get_class($plugin) . ' does not belong to '
                 . $expectedInterface
             );

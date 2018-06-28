@@ -2,7 +2,7 @@
 /**
  * Search params plugin manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +26,6 @@
  * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
 namespace VuFind\Search\Params;
-use Zend\ServiceManager\ConfigInterface;
 
 /**
  * Search params plugin manager
@@ -40,17 +39,84 @@ use Zend\ServiceManager\ConfigInterface;
 class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
 {
     /**
+     * Default plugin aliases.
+     *
+     * @var array
+     */
+    protected $aliases = [
+        'browzine' => 'VuFind\Search\BrowZine\Params',
+        'combined' => 'VuFind\Search\Combined\Params',
+        'eds' => 'VuFind\Search\EDS\Params',
+        'eit' => 'VuFind\Search\EIT\Params',
+        'emptyset' => 'VuFind\Search\EmptySet\Params',
+        'favorites' => 'VuFind\Search\Favorites\Params',
+        'libguides' => 'VuFind\Search\LibGuides\Params',
+        'mixedlist' => 'VuFind\Search\MixedList\Params',
+        'pazpar2' => 'VuFind\Search\Pazpar2\Params',
+        'primo' => 'VuFind\Search\Primo\Params',
+        'search2' => 'VuFind\Search\Search2\Params',
+        'solr' => 'VuFind\Search\Solr\Params',
+        'solrauth' => 'VuFind\Search\SolrAuth\Params',
+        'solrauthor' => 'VuFind\Search\SolrAuthor\Params',
+        'solrauthorfacets' => 'VuFind\Search\SolrAuthorFacets\Params',
+        'solrcollection' => 'VuFind\Search\SolrCollection\Params',
+        'solrreserves' => 'VuFind\Search\SolrReserves\Params',
+        'solrweb' => 'VuFind\Search\SolrWeb\Params',
+        'summon' => 'VuFind\Search\Summon\Params',
+        'tags' => 'VuFind\Search\Tags\Params',
+        'worldcat' => 'VuFind\Search\WorldCat\Params',
+    ];
+
+    /**
+     * Default plugin factories.
+     *
+     * @var array
+     */
+    protected $factories = [
+        'VuFind\Search\BrowZine\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\Combined\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\EDS\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\EIT\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\EmptySet\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\Favorites\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\LibGuides\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\MixedList\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\Pazpar2\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\Primo\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\Search2\Params' => 'VuFind\Search\Solr\ParamsFactory',
+        'VuFind\Search\Solr\Params' => 'VuFind\Search\Solr\ParamsFactory',
+        'VuFind\Search\SolrAuth\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\SolrAuthor\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\SolrAuthorFacets\Params' =>
+            'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\SolrCollection\Params' =>
+            'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\SolrReserves\Params' =>
+            'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\SolrWeb\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\Summon\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\Tags\Params' => 'VuFind\Search\Params\ParamsFactory',
+        'VuFind\Search\WorldCat\Params' => 'VuFind\Search\Params\ParamsFactory',
+    ];
+
+    /**
      * Constructor
      *
-     * @param ConfigInterface $configuration Configuration settings (optional)
+     * Make sure plugins are properly initialized.
+     *
+     * @param mixed $configOrContainerInstance Configuration or container instance
+     * @param array $v3config                  If $configOrContainerInstance is a
+     * container, this value will be passed to the parent constructor.
      */
-    public function __construct(ConfigInterface $configuration = null)
-    {
+    public function __construct($configOrContainerInstance = null,
+        array $v3config = []
+    ) {
         // These objects are not meant to be shared -- every time we retrieve one,
         // we are building a brand new object.
-        $this->setShareByDefault(false);
+        $this->sharedByDefault = false;
 
-        parent::__construct($configuration);
+        $this->addAbstractFactory('VuFind\Search\Params\PluginFactory');
+        parent::__construct($configOrContainerInstance, $v3config);
     }
 
     /**

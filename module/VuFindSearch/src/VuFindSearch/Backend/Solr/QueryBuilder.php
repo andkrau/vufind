@@ -3,7 +3,7 @@
 /**
  * SOLR QueryBuilder.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -30,11 +30,11 @@
  */
 namespace VuFindSearch\Backend\Solr;
 
+use VuFindSearch\ParamBag;
 use VuFindSearch\Query\AbstractQuery;
-use VuFindSearch\Query\QueryGroup;
 use VuFindSearch\Query\Query;
 
-use VuFindSearch\ParamBag;
+use VuFindSearch\Query\QueryGroup;
 
 /**
  * SOLR QueryBuilder.
@@ -71,11 +71,13 @@ class QueryBuilder implements QueryBuilderInterface
     protected $exactSpecs = [];
 
     /**
-     * Should we create the hl.q parameter when appropriate?
+     * Solr fields to highlight. Also serves as a flag for whether to perform
+     * highlight-specific behavior; if the field list is empty, highlighting is
+     * skipped.
      *
-     * @var bool
+     * @var string
      */
-    protected $createHighlightingQuery = false;
+    protected $fieldsToHighlight = '';
 
     /**
      * Should we create the spellcheck.q parameter when appropriate?
@@ -130,16 +132,18 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         if ($query instanceof QueryGroup) {
-            $query = $this->reduceQueryGroup($query);
+            $finalQuery = $this->reduceQueryGroup($query);
         } else {
-            $query->setString(
-                $this->getLuceneHelper()->normalizeSearchString($query->getString())
-            );
+            // Clone the query to avoid modifying the original user-visible query
+            $finalQuery = clone $query;
+            $finalQuery->setString($this->getNormalizedQueryString($query));
         }
+        $string = $finalQuery->getString() ?: '*:*';
 
-        $string  = $query->getString() ?: '*:*';
+        // Highlighting is enabled if we have a field list set.
+        $highlight = !empty($this->fieldsToHighlight);
 
-        if ($handler = $this->getSearchHandler($query->getHandler(), $string)) {
+        if ($handler = $this->getSearchHandler($finalQuery->getHandler(), $string)) {
             if (!$handler->hasExtendedDismax()
                 && $this->getLuceneHelper()->containsAdvancedLuceneSyntax($string)
             ) {
@@ -150,18 +154,11 @@ class QueryBuilder implements QueryBuilderInterface
 
                     // If a boost was added, we don't want to highlight based on
                     // the boost query, so we should use the non-boosted version:
-                    if ($this->createHighlightingQuery && $oldString != $string) {
+                    if ($highlight && $oldString != $string) {
                         $params->set('hl.q', $oldString);
                     }
                 }
-            } else if ($handler->hasDismax()) {
-                // If we're using extended dismax, we'll miss out on the question
-                // mark fix in createAdvancedInnerSearchString(), so we should
-                // apply it here. If other query munges arise that are valuable
-                // to both dismax and edismax, we should add a wrapper function
-                // around them and call it from here instead of this one very
-                // specific check.
-                $string = $this->fixTrailingQuestionMarks($string);
+            } elseif ($handler->hasDismax()) {
                 $params->set('qf', implode(' ', $handler->getDismaxFields()));
                 $params->set('qt', $handler->getDismaxHandler());
                 foreach ($handler->getDismaxParams() as $param) {
@@ -173,6 +170,11 @@ class QueryBuilder implements QueryBuilderInterface
             } else {
                 $string = $handler->createSimpleQueryString($string);
             }
+        }
+        // Set an appropriate highlight field list when applicable:
+        if ($highlight) {
+            $filter = $handler ? $handler->getAllFields() : [];
+            $params->add('hl.fl', $this->getFieldsToHighlight($filter));
         }
         $params->set('q', $string);
 
@@ -187,10 +189,49 @@ class QueryBuilder implements QueryBuilderInterface
      * @param bool $enable Should highlighting query generation be enabled?
      *
      * @return void
+     *
+     * @deprecated
      */
     public function setCreateHighlightingQuery($enable)
     {
-        $this->createHighlightingQuery = $enable;
+        // This is deprecated, but use it to manipulate the highlighted field
+        // list for backward compatibility.
+        $this->fieldsToHighlight = $enable ? '*' : '';
+    }
+
+    /**
+     * Get list of fields to highlight, filtered by array.
+     *
+     * @param array $filter Field list to use as a filter.
+     *
+     * @return string
+     */
+    protected function getFieldsToHighlight(array $filter = [])
+    {
+        // No filter? Return unmodified default:
+        if (empty($filter)) {
+            return $this->fieldsToHighlight;
+        }
+        // Account for possibility of comma OR space delimiters:
+        $fields = array_map('trim', preg_split('/[, ]/', $this->fieldsToHighlight));
+        // Wildcard in field list? Return filter as-is; otherwise, use intersection.
+        $list = in_array('*', $fields) ? $filter : array_intersect($fields, $filter);
+        return implode(',', $list);
+    }
+
+    /**
+     * Set list of fields to highlight, if any (or '*' for all). Set to an
+     * empty string (the default) to completely disable highlighting-related
+     * functionality.
+     *
+     * @param string $list Highlighting field list
+     *
+     * @return QueryBuilder
+     */
+    public function setFieldsToHighlight($list)
+    {
+        $this->fieldsToHighlight = $list;
+        return $this;
     }
 
     /**
@@ -329,8 +370,7 @@ class QueryBuilder implements QueryBuilderInterface
                 );
             }
         } else {
-            $searchString  = $this->getLuceneHelper()
-                ->normalizeSearchString($component->getString());
+            $searchString = $this->getNormalizedQueryString($component);
             $searchHandler = $this->getSearchHandler(
                 $component->getHandler(),
                 $searchString
@@ -360,7 +400,7 @@ class QueryBuilder implements QueryBuilderInterface
         }
         if ($advanced && $handler) {
             return $handler->createAdvancedQueryString($string);
-        } else if ($handler) {
+        } elseif ($handler) {
             return $handler->createSimpleQueryString($string);
         } else {
             return $string;
@@ -378,7 +418,9 @@ class QueryBuilder implements QueryBuilderInterface
      */
     protected function fixTrailingQuestionMarks($string)
     {
-        $multiword = preg_match('/[^\s]\s+[^\s]/', $string);
+        // Treat colon and whitespace as word separators -- in either case, we
+        // should add parentheses for accuracy.
+        $multiword = preg_match('/[^\s][\s:]+[^\s]/', $string);
         $callback = function ($matches) use ($multiword) {
             // Make sure all question marks are properly escaped (first unescape
             // any that are already escaped to prevent double-escapes, then escape
@@ -394,9 +436,25 @@ class QueryBuilder implements QueryBuilderInterface
         // Use a lookahead to skip matches found within quoted phrases.
         $lookahead = '(?=(?:[^\"]*+\"[^\"]*+\")*+[^\"]*+$)';
         $string = preg_replace_callback(
-            '/([^\s]+\?)(\s|$)' . $lookahead . '/', $callback, $string
+            '/([^\s:()]+\?)(\s|$)' . $lookahead . '/', $callback, $string
         );
         return rtrim($string);
+    }
+
+    /**
+     * Given a Query object, return a fully normalized version of the query string.
+     *
+     * @param Query $query Query object
+     *
+     * @return string
+     */
+    protected function getNormalizedQueryString($query)
+    {
+        return $this->fixTrailingQuestionMarks(
+            $this->getLuceneHelper()->normalizeSearchString(
+                $query->getString()
+            )
+        );
     }
 
     /**
@@ -422,9 +480,6 @@ class QueryBuilder implements QueryBuilderInterface
         if (strstr($string, ':')) {
             return $string;
         }
-
-        // Account for trailing question marks:
-        $string = $this->fixTrailingQuestionMarks($string);
 
         return $handler
             ? $handler->createAdvancedQueryString($string, false) : $string;

@@ -3,7 +3,7 @@
 /**
  * Manager for search backends.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -28,16 +28,15 @@
  */
 namespace VuFind\Search;
 
-use Zend\ServiceManager\ServiceLocatorInterface;
+use SplObjectStorage;
 
-use Zend\EventManager\SharedListenerAggregateInterface;
-use Zend\EventManager\SharedEventManagerInterface;
-use Zend\EventManager\EventInterface;
-
+use UnexpectedValueException;
 use VuFindSearch\Backend\BackendInterface;
 
-use SplObjectStorage;
-use UnexpectedValueException;
+use Zend\EventManager\EventInterface;
+
+use Zend\EventManager\SharedEventManagerInterface;
+use Zend\ServiceManager\ServiceLocatorInterface;
 
 /**
  * Manager for search backends.
@@ -48,7 +47,7 @@ use UnexpectedValueException;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
-class BackendManager implements SharedListenerAggregateInterface
+class BackendManager
 {
     /**
      * Backend registry.
@@ -100,7 +99,7 @@ class BackendManager implements SharedListenerAggregateInterface
      */
     public function get($name)
     {
-        $backend = $this->registry->get($name, false);
+        $backend = $this->registry->get($name);
         if (!is_object($backend)) {
             throw new UnexpectedValueException(
                 sprintf(
@@ -159,11 +158,8 @@ class BackendManager implements SharedListenerAggregateInterface
     public function attachShared(SharedEventManagerInterface $events)
     {
         if (!$this->listeners->offsetExists($events)) {
-            $listener = $events->attach(
-                'VuFind\Search',
-                'resolve',
-                [$this, 'onResolve']
-            );
+            $listener = [$this, 'onResolve'];
+            $events->attach('VuFind\Search', 'resolve', $listener);
             $this->listeners->attach($events, $listener);
         }
     }
@@ -179,7 +175,7 @@ class BackendManager implements SharedListenerAggregateInterface
     {
         if ($this->listeners->offsetExists($events)) {
             $listener = $this->listeners->offsetGet($events);
-            $events->detach('VuFind\Search', $listener);
+            $events->detach($listener, 'VuFind\Search');
             $this->listeners->detach($events);
         }
     }

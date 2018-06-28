@@ -2,7 +2,7 @@
 /**
  * Model for MARC records in Solr.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  * Copyright (C) The National Library of Finland 2015.
@@ -28,9 +28,6 @@
  * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
 namespace VuFind\RecordDriver;
-use VuFind\Exception\ILS as ILSException,
-    VuFind\View\Helper\Root\RecordLink,
-    VuFind\XSLT\Processor as XSLTProcessor;
 
 /**
  * Model for MARC records in Solr.
@@ -45,6 +42,7 @@ use VuFind\Exception\ILS as ILSException,
 class SolrMarc extends SolrDefault
 {
     use IlsAwareTrait;
+<<<<<<< HEAD
     
     /**
      * MARC record. Access only via getMarcRecord() as this is initialized lazily.
@@ -1039,4 +1037,8 @@ class SolrMarc extends SolrDefault
         }
         return null;
     }
+=======
+    use MarcReaderTrait;
+    use MarcAdvancedTrait;
+>>>>>>> upstream/master
 }

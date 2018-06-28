@@ -2,7 +2,7 @@
 /**
  * Mixed List aspect of the Search Multi-class (Results)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,6 +26,7 @@
  * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\MixedList;
+
 use VuFind\Search\Base\Results as BaseResults;
 
 /**
@@ -62,8 +63,7 @@ class Results extends BaseResults
     protected function performSearch()
     {
         $recordsToRequest = $this->getParams()->getRecordsToRequest();
-        $this->results = $this->getServiceLocator()->get('VuFind\RecordLoader')
-            ->loadBatch($recordsToRequest);
+        $this->results = $this->recordLoader->loadBatch($recordsToRequest);
         $this->resultTotal = count($this->results);
     }
 }

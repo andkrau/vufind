@@ -2,7 +2,7 @@
 /**
  * Model for Primo Central records.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -36,15 +36,8 @@ namespace VuFind\RecordDriver;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
-class Primo extends SolrDefault
+class Primo extends DefaultRecord
 {
-    /**
-     * Date converter
-     *
-     * @var \VuFind\Date\Converter
-     */
-    protected $dateConverter = null;
-
     /**
      * Get the short (pre-subtitle) title of the record.
      *
@@ -92,14 +85,23 @@ class Primo extends SolrDefault
      * Get an array of all subject headings associated with the record
      * (may be empty).
      *
+     * @param bool $extended Whether to return a keyed array with the following
+     * keys:
+     * - heading: the actual subject heading chunks
+     * - type: heading type
+     * - source: source vocabulary
+     *
      * @return array
      */
-    public function getAllSubjectHeadings()
+    public function getAllSubjectHeadings($extended = false)
     {
         $base = isset($this->fields['subjects'])
             ? $this->fields['subjects'] : [];
-        $callback = function ($str) {
-            return array_map('trim', explode(' -- ', $str));
+        $callback = function ($str) use ($extended) {
+            $s = array_map('trim', explode(' -- ', $str));
+            return $extended
+                ? ['heading' => $s, 'type' => '', 'source' => '']
+                : $s;
         };
         return array_map($callback, $base);
     }

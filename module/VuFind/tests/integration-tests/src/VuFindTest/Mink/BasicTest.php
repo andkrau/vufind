@@ -2,7 +2,7 @@
 /**
  * Very simple Mink test class.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -62,7 +62,7 @@ class BasicTest extends \VuFindTest\Unit\MinkTestCase
         $session = $this->getMinkSession();
         $session->visit($this->getVuFindUrl() . '/Search/Home');
         $page = $session->getPage();
-        $this->findCss($page, '.searchForm [name="lookfor"]')
+        $this->findCss($page, '#searchForm_lookfor')
             ->setValue('id:testsample1');
         $this->findCss($page, '.btn.btn-primary')->click();
         $this->snooze();

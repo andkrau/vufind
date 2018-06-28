@@ -2,7 +2,7 @@
 /**
  * AuthorFacets aspect of the Search Multi-class (Options)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -58,6 +58,18 @@ class Options extends \VuFind\Search\Solr\Options
 
         // No spell check needed in author module:
         $this->spellcheck = false;
+    }
+
+    /**
+     * Return the route name for the facet list action. Returns false to cover
+     * unimplemented support.
+     *
+     * @return string|bool
+     */
+    public function getFacetListAction()
+    {
+        // Not applicable here; we don't want to inherit the parent class' route.
+        return false;
     }
 
     /**

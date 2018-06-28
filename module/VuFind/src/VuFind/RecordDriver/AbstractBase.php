@@ -2,7 +2,7 @@
 /**
  * Abstract base record model.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,9 +26,8 @@
  * @link     https://vufind.org Main Page
  */
 namespace VuFind\RecordDriver;
-use VuFind\Exception\LoginRequired as LoginRequiredException,
-    VuFind\XSLT\Import\VuFind as ArticleStripper;
-use VuFind\Record\Cache;
+
+use VuFind\XSLT\Import\VuFind as ArticleStripper;
 
 /**
  * Abstract base record model.
@@ -43,12 +42,10 @@ use VuFind\Record\Cache;
  */
 abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
     \VuFind\I18n\Translator\TranslatorAwareInterface,
-    \VuFindSearch\Response\RecordInterface,
-    \VuFind\Record\Cache\RecordCacheAwareInterface
+    \VuFindSearch\Response\RecordInterface
 {
     use \VuFind\Db\Table\DbTableAwareTrait;
     use \VuFind\I18n\Translator\TranslatorAwareTrait;
-    use \VuFind\Record\Cache\RecordCacheAwareTrait;
 
     /**
      * Used for identifying search backends
@@ -228,66 +225,6 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
     }
 
     /**
-     * Save this record to the user's favorites.
-     *
-     * @param array               $params Array with some or all of these keys:
-     *  <ul>
-     *    <li>mytags - Tag array to associate with record (optional)</li>
-     *    <li>notes - Notes to associate with record (optional)</li>
-     *    <li>list - ID of list to save record into (omit to create new list)</li>
-     *  </ul>
-     * @param \VuFind\Db\Row\User $user   The user saving the record
-     *
-     * @return array list information
-     */
-    public function saveToFavorites($params, $user)
-    {
-        // Validate incoming parameters:
-        if (!$user) {
-            throw new LoginRequiredException('You must be logged in first');
-        }
-
-        // Get or create a list object as needed:
-        $listId = isset($params['list']) ? $params['list'] : '';
-        $table = $this->getDbTable('UserList');
-        if (empty($listId) || $listId == 'NEW') {
-            $list = $table->getNew($user);
-            $list->title = $this->translate('My Favorites');
-            $list->save($user);
-        } else {
-            $list = $table->getExisting($listId);
-            // Validate incoming list ID:
-            if (!$list->editAllowed($user)) {
-                throw new \VuFind\Exception\ListPermission('Access denied.');
-            }
-            $list->rememberLastUsed(); // handled by save() in other case
-        }
-
-        // Get or create a resource object as needed:
-        $resourceTable = $this->getDbTable('Resource');
-        $resource = $resourceTable->findResource(
-            $this->getUniqueId(), $this->getSourceIdentifier(), true, $this
-        );
-
-        // Persist record in the database for "offline" use
-        if ($recordCache = $this->getRecordCache()) {
-            $recordCache->setContext(Cache::CONTEXT_FAVORITE);
-            $recordCache->createOrUpdate(
-                $resource->record_id, $resource->source,
-                $this->getRawData()
-            );
-        }
-
-        // Add the information to the user's account:
-        $user->saveResource(
-            $resource, $list,
-            isset($params['mytags']) ? $params['mytags'] : [],
-            isset($params['notes']) ? $params['notes'] : ''
-        );
-        return ['listId' => $list->id];
-    }
-
-    /**
      * Get notes associated with this record in user lists.
      *
      * @param int $list_id ID of list to load tags from (null for all lists)
@@ -357,41 +294,6 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
     public function getSourceIdentifier()
     {
         return $this->sourceIdentifier;
-    }
-
-    /**
-     * Return an array of related record suggestion objects (implementing the
-     * \VuFind\Related\RelatedInterface) based on the current record.
-     *
-     * @param \VuFind\Related\PluginManager $factory Related module plugin factory
-     * @param array                         $types   Array of relationship types to
-     * load; each entry should be a service name (i.e. 'Similar' or 'Editions')
-     * optionally followed by a colon-separated list of parameters to pass to the
-     * constructor.  If the parameter is set to null instead of an array, default
-     * settings will be loaded from config.ini.
-     *
-     * @return array
-     */
-    public function getRelated(\VuFind\Related\PluginManager $factory, $types = null)
-    {
-        if (is_null($types)) {
-            $types = isset($this->recordConfig->Record->related) ?
-                $this->recordConfig->Record->related : [];
-        }
-        $retVal = [];
-        foreach ($types as $current) {
-            $parts = explode(':', $current);
-            $type = $parts[0];
-            $params = isset($parts[1]) ? $parts[1] : null;
-            if ($factory->has($type)) {
-                $plugin = $factory->get($type);
-                $plugin->init($params, $this);
-                $retVal[] = $plugin;
-            } else {
-                throw new \Exception("Related module {$type} does not exist.");
-            }
-        }
-        return $retVal;
     }
 
     /**
@@ -495,15 +397,15 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
      * useful for checking for the existence of get methods for particular types of
      * data without causing fatal errors.
      *
-     * @param string $method Name of method to call.
-     * @param array  $params Array of parameters to pass to method.
+     * @param string $method  Name of method to call.
+     * @param array  $params  Array of parameters to pass to method.
+     * @param mixed  $default A default value to return if the method is not
+     * callable
      *
      * @return mixed
      */
-    public function tryMethod($method, $params = [])
+    public function tryMethod($method, $params = [], $default = null)
     {
-        return is_callable([$this, $method])
-            ? call_user_func_array([$this, $method], $params)
-            : null;
+        return is_callable([$this, $method]) ? $this->$method(...$params) : $default;
     }
 }

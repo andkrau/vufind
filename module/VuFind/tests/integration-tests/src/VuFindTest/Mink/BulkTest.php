@@ -2,7 +2,7 @@
 /**
  * Mink bulk action test class.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2016.
  *
@@ -26,6 +26,7 @@
  * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\Mink;
+
 use Behat\Mink\Element\Element;
 
 /**
@@ -61,7 +62,10 @@ class BulkTest extends \VuFindTest\Unit\MinkTestCase
         $session = $this->getMinkSession();
         $path = '/Search/Results?lookfor=id%3A(testsample1+OR+testsample2)';
         $session->visit($this->getVuFindUrl() . $path);
-        return $session->getPage();
+        $page = $session->getPage();
+        // Hide autocomplete menu
+        $this->findCss($page, '#side-panel-format .title')->click();
+        return $page;
     }
 
     /**
@@ -132,6 +136,7 @@ class BulkTest extends \VuFindTest\Unit\MinkTestCase
 
         // First try clicking without selecting anything:
         $button->click();
+        $this->snooze();
         $this->checkForNonSelectedMessage($page);
         $page->find('css', '.modal-body .btn')->click();
         $this->snooze();
@@ -147,10 +152,11 @@ class BulkTest extends \VuFindTest\Unit\MinkTestCase
         $this->fillInAccountForm($page);
         $this->findCss($page, '.modal-body .btn.btn-primary')->click();
 
-        $this->findCss($page, '.modal #email_from')->setValue('asdf@asdf.com');
-        $this->findCss($page, '.modal #email_message')->setValue('message');
-        $this->findCss($page, '.modal #email_to')
-            ->setValue('demian.katz@villanova.edu');
+        $this->findCssAndSetValue($page, '.modal #email_from', 'asdf@asdf.com');
+        $this->findCssAndSetValue($page, '.modal #email_message', 'message');
+        $this->findCssAndSetValue(
+            $page, '.modal #email_to', 'demian.katz@villanova.edu'
+        );
         $this->findCss($page, '.modal-body .btn.btn-primary')->click();
         $this->snooze();
         /* TODO: add back this check when everything is working (as of this
@@ -176,6 +182,7 @@ class BulkTest extends \VuFindTest\Unit\MinkTestCase
 
         // First try clicking without selecting anything:
         $button->click();
+        $this->snooze();
         $this->checkForNonSelectedMessage($page);
         $page->find('css', '.modal-body .btn')->click();
         $this->snooze();
@@ -192,6 +199,7 @@ class BulkTest extends \VuFindTest\Unit\MinkTestCase
 
         // Save the favorites.
         $this->findCss($page, '.modal-body input[name=submit]')->click();
+        $this->snooze();
         $result = $this->findCss($page, '.modal-body .alert-success');
         $this->assertEquals(
             'Your item(s) were saved successfully. Go to List.', $result->getText()
@@ -221,6 +229,7 @@ class BulkTest extends \VuFindTest\Unit\MinkTestCase
 
         // First try clicking without selecting anything:
         $button->click();
+        $this->snooze();
         $this->checkForNonSelectedMessage($page);
         $page->find('css', '.modal-body .btn')->click();
         $this->snooze();
@@ -237,6 +246,7 @@ class BulkTest extends \VuFindTest\Unit\MinkTestCase
         // Do the export:
         $submit = $this->findCss($page, '.modal-body input[name=submit]');
         $submit->click();
+        $this->snooze();
         $result = $this->findCss($page, '.modal-body .alert .text-center .btn');
         $this->assertEquals('Download File', $result->getText());
     }
@@ -254,6 +264,7 @@ class BulkTest extends \VuFindTest\Unit\MinkTestCase
 
         // First try clicking without selecting anything:
         $button->click();
+        $this->snooze();
         $this->checkForNonSelectedMessage($page);
         $page->find('css', '.modal-body .btn')->click();
         $this->snooze();

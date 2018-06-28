@@ -2,7 +2,7 @@
 /**
  * Search results plugin manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +26,6 @@
  * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
 namespace VuFind\Search\Results;
-use Zend\ServiceManager\ConfigInterface;
 
 /**
  * Search results plugin manager
@@ -40,17 +39,85 @@ use Zend\ServiceManager\ConfigInterface;
 class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
 {
     /**
+     * Default plugin aliases.
+     *
+     * @var array
+     */
+    protected $aliases = [
+        'browzine' => 'VuFind\Search\BrowZine\Results',
+        'combined' => 'VuFind\Search\Combined\Results',
+        'eds' => 'VuFind\Search\EDS\Results',
+        'eit' => 'VuFind\Search\EIT\Results',
+        'emptyset' => 'VuFind\Search\EmptySet\Results',
+        'favorites' => 'VuFind\Search\Favorites\Results',
+        'libguides' => 'VuFind\Search\LibGuides\Results',
+        'mixedlist' => 'VuFind\Search\MixedList\Results',
+        'pazpar2' => 'VuFind\Search\Pazpar2\Results',
+        'primo' => 'VuFind\Search\Primo\Results',
+        'search2' => 'VuFind\Search\Search2\Results',
+        'solr' => 'VuFind\Search\Solr\Results',
+        'solrauth' => 'VuFind\Search\SolrAuth\Results',
+        'solrauthor' => 'VuFind\Search\SolrAuthor\Results',
+        'solrauthorfacets' => 'VuFind\Search\SolrAuthorFacets\Results',
+        'solrcollection' => 'VuFind\Search\SolrCollection\Results',
+        'solrreserves' => 'VuFind\Search\SolrReserves\Results',
+        'solrweb' => 'VuFind\Search\SolrWeb\Results',
+        'summon' => 'VuFind\Search\Summon\Results',
+        'tags' => 'VuFind\Search\Tags\Results',
+        'worldcat' => 'VuFind\Search\WorldCat\Results',
+    ];
+
+    /**
+     * Default plugin factories.
+     *
+     * @var array
+     */
+    protected $factories = [
+        'VuFind\Search\BrowZine\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\Combined\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\EDS\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\EIT\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\EmptySet\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\Favorites\Results' =>
+            'VuFind\Search\Favorites\ResultsFactory',
+        'VuFind\Search\LibGuides\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\MixedList\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\Pazpar2\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\Primo\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\Search2\Results' => 'VuFind\Search\Search2\ResultsFactory',
+        'VuFind\Search\Solr\Results' => 'VuFind\Search\Solr\ResultsFactory',
+        'VuFind\Search\SolrAuth\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\SolrAuthor\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\SolrAuthorFacets\Results' =>
+            'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\SolrCollection\Results' =>
+            'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\SolrReserves\Results' =>
+            'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\SolrWeb\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\Summon\Results' => 'VuFind\Search\Results\ResultsFactory',
+        'VuFind\Search\Tags\Results' => 'VuFind\Search\Tags\ResultsFactory',
+        'VuFind\Search\WorldCat\Results' => 'VuFind\Search\Results\ResultsFactory',
+    ];
+
+    /**
      * Constructor
      *
-     * @param ConfigInterface $configuration Configuration settings (optional)
+     * Make sure plugins are properly initialized.
+     *
+     * @param mixed $configOrContainerInstance Configuration or container instance
+     * @param array $v3config                  If $configOrContainerInstance is a
+     * container, this value will be passed to the parent constructor.
      */
-    public function __construct(ConfigInterface $configuration = null)
-    {
+    public function __construct($configOrContainerInstance = null,
+        array $v3config = []
+    ) {
         // These objects are not meant to be shared -- every time we retrieve one,
         // we are building a brand new object.
-        $this->setShareByDefault(false);
+        $this->sharedByDefault = false;
 
-        parent::__construct($configuration);
+        $this->addAbstractFactory('VuFind\Search\Results\PluginFactory');
+        parent::__construct($configOrContainerInstance, $v3config);
     }
 
     /**

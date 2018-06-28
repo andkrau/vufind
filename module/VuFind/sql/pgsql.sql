@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS "comments";
 
 CREATE TABLE comments (
 id SERIAL,
-user_id int NOT NULL DEFAULT '0',
+user_id int DEFAULT NULL,
 resource_id int NOT NULL DEFAULT '0',
 comment text NOT NULL,
 created timestamp NOT NULL DEFAULT '1970-01-01 00:00:00',
@@ -114,6 +114,7 @@ pass_hash varchar(60) DEFAULT NULL,
 firstname varchar(50) NOT NULL DEFAULT '',
 lastname varchar(50) NOT NULL DEFAULT '',
 email varchar(255) NOT NULL DEFAULT '',
+cat_id varchar(255) DEFAULT NULL,
 cat_username varchar(50) DEFAULT NULL,
 cat_password varchar(70) DEFAULT NULL,
 cat_pass_enc varchar(170) DEFAULT NULL,
@@ -122,8 +123,11 @@ major varchar(100) NOT NULL DEFAULT '',
 home_library varchar(100) NOT NULL DEFAULT '',
 created timestamp NOT NULL DEFAULT '1970-01-01 00:00:00',
 verify_hash varchar(42) NOT NULL DEFAULT '',
+last_login timestamp NOT NULL DEFAULT '1970-01-01 00:00:00',
+auth_method varchar(50) DEFAULT NULL,
 PRIMARY KEY (id),
-UNIQUE (username)
+UNIQUE (username),
+UNIQUE (cat_id)
 );
 
 
@@ -237,45 +241,6 @@ PRIMARY KEY (id)
 -- --------------------------------------------------------
 
 --
--- Statistics tables
---
-
---
--- Table structure for table statistics
---
-
-DROP TABLE IF EXISTS "user_stats_fields";
-
-CREATE TABLE user_stats_fields (
-id varchar(24) NOT NULL,
-field varchar(32) NOT NULL,
-value varchar(1024) NOT NULL,
-PRIMARY KEY (id, field)
-);
-
--- --------------------------------------------------------
-
---
--- Table structure for table user_stats
---
-
-DROP TABLE IF EXISTS "user_stats";
-
-CREATE TABLE user_stats (
-id varchar(24) NOT NULL,
-datestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-browser varchar(32) NOT NULL,
-browserVersion varchar(8) NOT NULL,
-ipaddress varchar(15) NOT NULL,
-referrer varchar(512) NOT NULL,
-url varchar(512) NOT NULL,
-session varchar(64) NOT NULL,
-PRIMARY KEY (id)
-);
-
--- --------------------------------------------------------
-
---
 -- Table structure for table record
 --
 
@@ -294,7 +259,7 @@ CREATE TABLE record (
 
 -- --------------------------------------------------------
 
--- 
+--
 -- Table structure for table user_card
 --
 
@@ -326,7 +291,7 @@ CREATE INDEX user_card_user_id_idx ON user_card (user_id);
 -- Constraints for table comments
 --
 ALTER TABLE comments
-ADD CONSTRAINT comments_ibfk_1 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE,
+ADD CONSTRAINT comments_ibfk_1 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE SET NULL,
 ADD CONSTRAINT comments_ibfk_2 FOREIGN KEY (resource_id) REFERENCES resource (id) ON DELETE CASCADE;
 
 

@@ -2,7 +2,7 @@
 /**
  * Primo Central Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -27,6 +27,8 @@
  */
 namespace VuFind\Controller;
 
+use Zend\ServiceManager\ServiceLocatorInterface;
+
 /**
  * Primo Central Controller
  *
@@ -40,21 +42,14 @@ class PrimoController extends AbstractSearch
 {
     /**
      * Constructor
-     */
-    public function __construct()
-    {
-        $this->searchClassId = 'Primo';
-        parent::__construct();
-    }
-
-    /**
-     * Home action
      *
-     * @return mixed
+     * @param ServiceLocatorInterface $sm Service locator
      */
-    public function homeAction()
+    public function __construct(ServiceLocatorInterface $sm)
     {
-        return $this->createViewModel();
+        $this->accessPermission = 'access.PrimoModule';
+        $this->searchClassId = 'Primo';
+        parent::__construct($sm);
     }
 
     /**
@@ -64,9 +59,10 @@ class PrimoController extends AbstractSearch
      */
     protected function resultScrollerActive()
     {
-        $config = $this->getServiceLocator()->get('VuFind\Config')->get('Primo');
-        return (isset($config->Record->next_prev_navigation)
-            && $config->Record->next_prev_navigation);
+        $config = $this->serviceLocator->get('VuFind\Config\PluginManager')
+            ->get('Primo');
+        return isset($config->Record->next_prev_navigation)
+            && $config->Record->next_prev_navigation;
     }
 
     /**

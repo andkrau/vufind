@@ -1,4 +1,4 @@
-/*global grecaptcha, recaptchaOnLoad, VuFind */
+/*global grecaptcha, recaptchaOnLoad, resetCaptcha, VuFind */
 VuFind.register('lightbox', function Lightbox() {
   // State
   var _originalUrl = false;
@@ -63,17 +63,27 @@ VuFind.register('lightbox', function Lightbox() {
    *
    * data-lightbox-ignore = do not submit this form in lightbox
    */
-  var _constrainLink; // function declarations to avoid style warnings
-  var _formSubmit;    // about circular references
-  function _update(content) {
+  // function declarations to avoid style warnings about circular references
+  var _constrainLink;
+  var _formSubmit;
+  function render(content) {
     if (!content.match) {
       return;
     }
     // Isolate successes
     var htmlDiv = $('<div/>').html(content);
-    var alerts = htmlDiv.find('.flash-message.alert-success');
+    var alerts = htmlDiv.find('.flash-message.alert-success:not([data-lightbox-ignore])');
     if (alerts.length > 0) {
-      showAlert(alerts[0].innerHTML, 'success');
+      var msgs = alerts.toArray().map(function getSuccessHtml(el) {
+        return el.innerHTML;
+      }).join('<br/>');
+      var href = alerts.find('.download').attr('href');
+      if (typeof href !== 'undefined') {
+        location.href = href;
+        _modal.modal('hide');
+      } else {
+        showAlert(msgs, 'success');
+      }
       return;
     }
     // Deframe HTML
@@ -127,25 +137,33 @@ VuFind.register('lightbox', function Lightbox() {
     _xhr = $.ajax(obj);
     _xhr.always(function lbAjaxAlways() { _xhr = false; })
       .done(function lbAjaxDone(content, status, jq_xhr) {
-        if (jq_xhr.status === 205) {
-          VuFind.refreshPage();
-          return;
-        }
-        // Place Hold error isolation
-        if (obj.url.match(/\/Record/) && (obj.url.match(/Hold\?/) || obj.url.match(/Request\?/))) {
+        var errorMsgs = [];
+        if (jq_xhr.status !== 205) {
           var testDiv = $('<div/>').html(content);
-          var error = testDiv.find('.flash-message.alert-danger');
-          if (error.length && testDiv.find('.record').length) {
-            showAlert(error[0].innerHTML, 'danger');
-            return false;
+          errorMsgs = testDiv.find('.flash-message.alert-danger:not([data-lightbox-ignore])');
+          // Place Hold error isolation
+          if (obj.url.match(/\/Record\/.*(Hold|Request)\?/)) {
+            if (errorMsgs.length && testDiv.find('.record').length) {
+              var msgs = errorMsgs.toArray().map(function getAlertHtml(el) {
+                return el.innerHTML;
+              }).join('<br/>');
+              showAlert(msgs, 'danger');
+              return false;
+            }
           }
         }
-        if ( // Close the lightbox after deliberate login
-          obj.method                                                                 // is a form
-          && ((obj.url.match(/MyResearch/) && !obj.url.match(/Bulk/) && !obj.url.match(/Delete/) && !obj.url.match(/Recover/)) // that matches login/create account
-            || obj.url.match(/catalogLogin/))                                        // or catalog login for holds
-          && $('<div/>').html(content).find('.flash-message.alert-danger').length === 0 // skip failed logins
+        // Close the lightbox after deliberate login provided that:
+        // - is a form
+        // - catalog login for holds
+        // - or that matches login/create account
+        // - not a failed login
+        if (
+          obj.method && (
+            obj.url.match(/catalogLogin/)
+            || obj.url.match(/MyResearch\/(?!Bulk|Delete|Recover)/)
+          ) && errorMsgs.length === 0
         ) {
+
           var eventResult = _emit('VuFind.lightbox.login', {
             originalUrl: _originalUrl,
             formUrl: obj.url
@@ -160,7 +178,11 @@ VuFind.register('lightbox', function Lightbox() {
           }
           _currentUrl = _originalUrl; // Now that we're logged in, where were we?
         }
-        _update(content);
+        if (jq_xhr.status === 205) {
+          VuFind.refreshPage();
+          return;
+        }
+        render(content);
       })
       .fail(function lbAjaxFail(deferred, errorType, msg) {
         showAlert(VuFind.translate('error_occurred') + '<br/>' + msg, 'danger');
@@ -177,9 +199,23 @@ VuFind.register('lightbox', function Lightbox() {
   function _evalCallback(callback, event, data) {
     if ('function' === typeof window[callback]) {
       return window[callback](event, data);
-    } else {
-      return eval('(function(event, data) {' + callback + '}())'); // inline code
     }
+    var parts = callback.split('.');
+    if (typeof window[parts[0]] === 'object') {
+      var obj = window[parts[0]];
+      for (var i = 1; i < parts.length; i++) {
+        if (typeof obj[parts[i]] === 'undefined') {
+          obj = false;
+          break;
+        }
+        obj = obj[parts[i]];
+      }
+      if ('function' === typeof obj) {
+        return obj(event, data);
+      }
+    }
+    console.error('Lightbox callback function not found.');
+    return null;
   }
 
   /**
@@ -191,7 +227,11 @@ VuFind.register('lightbox', function Lightbox() {
    * data-lightbox-title = Lightbox title (overrides any title the page provides)
    */
   _constrainLink = function constrainLink(event) {
-    if (typeof $(this).data('lightboxIgnore') != 'undefined' || this.attributes.href.value.charAt(0) === '#') {
+    if (typeof $(this).data('lightboxIgnore') != 'undefined'
+      || typeof this.attributes.href === 'undefined'
+      || this.attributes.href.value.charAt(0) === '#'
+      || this.href.match(/^[a-zA-Z]+:[^/]/) // ignore resource identifiers (mailto:, tel:, etc.)
+    ) {
       return true;
     }
     if (this.href.length > 1) {
@@ -266,7 +306,7 @@ VuFind.register('lightbox', function Lightbox() {
       }, false);
     }
     // Loading
-    _modalBody.prepend('<i class="fa fa-spinner fa-spin pull-right" title="' + VuFind.translate('loading') + '"></i>');
+    _modalBody.prepend('<i class="modal-loading fa fa-spinner fa-spin" title="' + VuFind.translate('loading') + '"></i>');
     // Prevent multiple submission of submit button in lightbox
     if (submit.closest(_modal).length > 0) {
       submit.attr('disabled', 'disabled');
@@ -279,9 +319,7 @@ VuFind.register('lightbox', function Lightbox() {
       method: $(form).attr('method') || 'GET',
       data: data
     }).done(function recaptchaReset() {
-      if (typeof grecaptcha !== 'undefined') {
-        grecaptcha.reset($(form).find('.g-recaptcha').data('captchaId'));
-      }
+      resetCaptcha($(form));
     });
 
     VuFind.modal('show');
@@ -301,7 +339,10 @@ VuFind.register('lightbox', function Lightbox() {
     // Handle submit buttons attached to a form as well as those in a form. Store
     // information about which button was clicked here as checking focused button
     // doesn't work on all browsers and platforms.
-    $('form[data-lightbox] [type=submit]').click(_storeClickedStatus);
+    $('form[data-lightbox]').each(function bindFormSubmitsLightbox(i, form) {
+      $(form).find('[type=submit]').click(_storeClickedStatus);
+      $('[type="submit"][form="' + form.id + '"]').click(_storeClickedStatus);
+    });
   }
 
   function reset() {
@@ -318,6 +359,7 @@ VuFind.register('lightbox', function Lightbox() {
       if (VuFind.lightbox.refreshOnClose) {
         VuFind.refreshPage();
       }
+      this.setAttribute('aria-hidden', true);
       _emit('VuFind.lightbox.closing');
     });
     _modal.on('hidden.bs.modal', function lightboxHidden() {
@@ -327,7 +369,7 @@ VuFind.register('lightbox', function Lightbox() {
 
     VuFind.modal = function modalShortcut(cmd) {
       if (cmd === 'show') {
-        _modal.modal($.extend({ show: true }, _modalParams));
+        _modal.modal($.extend({ show: true }, _modalParams)).attr('aria-hidden', false);
       } else {
         _modal.modal(cmd);
       }
@@ -346,6 +388,7 @@ VuFind.register('lightbox', function Lightbox() {
     bind: bind,
     flashMessage: flashMessage,
     reload: reload,
+    render: render,
     // Reset
     reset: reset,
     // Init

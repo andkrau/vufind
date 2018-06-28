@@ -2,7 +2,7 @@
 /**
  * Related record plugin manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +26,6 @@
  * @link     https://vufind.org/wiki/development:plugins:related_records_modules Wiki
  */
 namespace VuFind\Related;
-use Zend\ServiceManager\ConfigInterface;
 
 /**
  * Related record plugin manager
@@ -40,18 +39,48 @@ use Zend\ServiceManager\ConfigInterface;
 class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
 {
     /**
+     * Default plugin aliases.
+     *
+     * @var array
+     */
+    protected $aliases = [
+        'channels' => 'VuFind\Related\Channels',
+        'editions' => 'VuFind\Related\Deprecated',
+        'similar' => 'VuFind\Related\Similar',
+        'worldcateditions' => 'VuFind\Related\Deprecated',
+        'worldcatsimilar' => 'VuFind\Related\WorldCatSimilar',
+    ];
+
+    /**
+     * Default plugin factories.
+     *
+     * @var array
+     */
+    protected $factories = [
+        'VuFind\Related\Channels' => 'Zend\ServiceManager\Factory\InvokableFactory',
+        'VuFind\Related\Deprecated' =>
+            'Zend\ServiceManager\Factory\InvokableFactory',
+        'VuFind\Related\Similar' => 'VuFind\Related\SimilarFactory',
+        'VuFind\Related\WorldCatSimilar' => 'VuFind\Related\SimilarFactory',
+    ];
+
+    /**
      * Constructor
      *
-     * @param ConfigInterface $configuration Configuration settings (optional)
+     * Make sure plugins are properly initialized.
+     *
+     * @param mixed $configOrContainerInstance Configuration or container instance
+     * @param array $v3config                  If $configOrContainerInstance is a
+     * container, this value will be passed to the parent constructor.
      */
-    public function __construct(ConfigInterface $configuration = null)
-    {
-        // These plugins are not meant to be shared -- the same module may be used
-        // multiple times with different configurations, so we need to build a new
-        // copy each time the plugin is retrieved.
-        $this->setShareByDefault(false);
-
-        parent::__construct($configuration);
+    public function __construct($configOrContainerInstance = null,
+        array $v3config = []
+    ) {
+        // These objects are not meant to be shared -- every time we retrieve one,
+        // we are building a brand new object.
+        $this->sharedByDefault = false;
+        $this->addAbstractFactory('VuFind\Related\PluginFactory');
+        parent::__construct($configOrContainerInstance, $v3config);
     }
 
     /**

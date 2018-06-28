@@ -2,7 +2,7 @@
 /**
  * VuFind Theme Initializer
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,9 +26,12 @@
  * @link     https://vufind.org Main Site
  */
 namespace VuFindTheme;
-use Zend\Config\Config,
-    Zend\Mvc\MvcEvent,
-    Zend\Stdlib\RequestInterface as Request;
+
+use Zend\Config\Config;
+use Zend\Console\Console;
+use Zend\Mvc\MvcEvent;
+use Zend\Mvc\View\Http\InjectTemplateListener as BaseInjectTemplateListener;
+use Zend\Stdlib\RequestInterface as Request;
 
 /**
  * VuFind Theme Initializer
@@ -82,6 +85,13 @@ class Initializer
      * @var \VuFind\Cookie\CookieManager
      */
     protected $cookieManager;
+
+    /**
+     * A static flag used to determine if the theme has been initialized
+     *
+     * @var bool
+     */
+    protected static $themeInitialized = false;
 
     /**
      * Constructor
@@ -140,23 +150,23 @@ class Initializer
 
         // Detach the default listener:
         $listeners = $sharedEvents->getListeners(
-            'Zend\Stdlib\DispatchableInterface', MvcEvent::EVENT_DISPATCH
+            ['Zend\Stdlib\DispatchableInterface'], MvcEvent::EVENT_DISPATCH
         );
-        foreach ($listeners as $listener) {
-            $metadata = $listener->getMetadata();
-            $callback = $listener->getCallback();
-            if (is_a($callback[0], 'Zend\Mvc\View\Http\InjectTemplateListener')) {
-                $priority = $metadata['priority'];
-                $sharedEvents->detach(
-                    'Zend\Stdlib\DispatchableInterface', $listener
-                );
-                break;
+        foreach ($listeners as $priority => $priorityGroup) {
+            foreach ($priorityGroup as $callback) {
+                if ($callback[0] instanceof BaseInjectTemplateListener) {
+                    $injectTemplatePriority = $priority;
+                    $sharedEvents->detach(
+                        $callback, 'Zend\Stdlib\DispatchableInterface'
+                    );
+                    break 2;
+                }
             }
         }
 
         // If we didn't successfully detach a listener above, priority will not be
         // set.  This is an unexpected situation, so we should throw an exception.
-        if (!isset($priority)) {
+        if (!isset($injectTemplatePriority)) {
             throw new \Exception('Unable to detach InjectTemplateListener');
         }
 
@@ -164,7 +174,7 @@ class Initializer
         $injectTemplateListener  = new InjectTemplateListener();
         $sharedEvents->attach(
             'Zend\Stdlib\DispatchableInterface', MvcEvent::EVENT_DISPATCH,
-            [$injectTemplateListener, 'injectTemplate'], $priority
+            [$injectTemplateListener, 'injectTemplate'], $injectTemplatePriority
         );
     }
 
@@ -177,6 +187,12 @@ class Initializer
      */
     public function init()
     {
+        // Make sure to initialize the theme just once
+        if (self::$themeInitialized) {
+            return;
+        }
+        self::$themeInitialized = true;
+
         // Determine the current theme:
         $currentTheme = $this->pickTheme($this->event->getRequest());
 
@@ -214,6 +230,9 @@ class Initializer
     {
         // Load standard configuration options:
         $standardTheme = $this->config->theme;
+        if (Console::isConsole()) {
+            return $standardTheme;
+        }
         $mobileTheme = $this->mobile->enabled()
             ? $this->config->mobile_theme : false;
 
@@ -267,10 +286,12 @@ class Initializer
     protected function sendThemeOptionsToView()
     {
         // Get access to the view model:
-        $viewModel = $this->serviceManager->get('viewmanager')->getViewModel();
+        if (!Console::isConsole()) {
+            $viewModel = $this->serviceManager->get('ViewManager')->getViewModel();
 
-        // Send down the view options:
-        $viewModel->setVariable('themeOptions', $this->getThemeOptions());
+            // Send down the view options:
+            $viewModel->setVariable('themeOptions', $this->getThemeOptions());
+        }
     }
 
     /**
@@ -310,7 +331,7 @@ class Initializer
     protected function setUpThemeViewHelpers($helpers)
     {
         // Grab the helper loader from the view manager:
-        $loader = $this->serviceManager->get('viewmanager')->getHelperManager();
+        $loader = $this->serviceManager->get('ViewHelperManager');
 
         // Register all the helpers:
         $config = new \Zend\ServiceManager\Config($helpers);
@@ -376,7 +397,7 @@ class Initializer
         }
 
         // Inject the path stack generated above into the view resolver:
-        $resolver = $this->serviceManager->get('viewmanager')->getResolver();
+        $resolver = $this->serviceManager->get('ViewResolver');
         if (!is_a($resolver, 'Zend\View\Resolver\AggregateResolver')) {
             throw new \Exception('Unexpected resolver: ' . get_class($resolver));
         }
@@ -410,11 +431,11 @@ class Initializer
 
         if (!empty($pathStack)) {
             try {
-                $translator = $this->serviceManager->get('VuFind\Translator');
+                $translator = $this->serviceManager->get('Zend\Mvc\I18n\Translator');
 
                 $pm = $translator->getPluginManager();
-                $pm->get('extendedini')->addToPathStack($pathStack);
-            } catch (\Zend\Mvc\Exception\BadMethodCallException $e) {
+                $pm->get('ExtendedIni')->addToPathStack($pathStack);
+            } catch (\Zend\Mvc\I18n\Exception\BadMethodCallException $e) {
                 // This exception likely indicates that translation is disabled,
                 // so we can't proceed.
                 return;
@@ -423,13 +444,13 @@ class Initializer
             // Override the default cache with a theme-specific cache to avoid
             // key collisions in a multi-theme environment.
             try {
-                $cacheManager = $this->serviceManager->get('VuFind\CacheManager');
+                $cacheManager = $this->serviceManager->get('VuFind\Cache\Manager');
                 $cacheName = $cacheManager->addLanguageCacheForTheme($theme);
                 $translator->setCache($cacheManager->getCache($cacheName));
             } catch (\Exception $e) {
                 // Don't let a cache failure kill the whole application, but make
                 // note of it:
-                $logger = $this->serviceManager->get('VuFind\Logger');
+                $logger = $this->serviceManager->get('VuFind\Log\Logger');
                 $logger->debug(
                     'Problem loading cache: ' . get_class($e) . ' exception: '
                     . $e->getMessage()

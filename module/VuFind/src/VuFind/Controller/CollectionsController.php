@@ -2,7 +2,7 @@
 /**
  * Collections Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +26,10 @@
  * @link     https://vufind.org Main Site
  */
 namespace VuFind\Controller;
+
 use VuFindSearch\Query\Query;
+use Zend\Config\Config;
+use Zend\ServiceManager\ServiceLocatorInterface;
 
 /**
  * Collections Controller
@@ -49,11 +52,13 @@ class CollectionsController extends AbstractBase
     /**
      * Constructor
      *
-     * @param \Zend\Config\Config $config VuFind configuration
+     * @param ServiceLocatorInterface $sm     Service manager
+     * @param Config                  $config VuFind configuration
      */
-    public function __construct(\Zend\Config\Config $config)
+    public function __construct(ServiceLocatorInterface $sm, Config $config)
     {
         $this->config = $config;
+        parent::__construct($sm);
     }
 
     /**
@@ -111,7 +116,7 @@ class CollectionsController extends AbstractBase
         $limit = $this->getBrowseLimit();
 
         // Load Solr data or die trying:
-        $db = $this->getServiceLocator()->get('VuFind\Search\BackendManager')
+        $db = $this->serviceLocator->get('VuFind\Search\BackendManager')
             ->get('Solr');
         $result = $db->alphabeticBrowse($source, $from, $page, $limit);
 
@@ -168,8 +173,8 @@ class CollectionsController extends AbstractBase
 
         $browseField = "hierarchy_browse";
 
-        $searchObject = $this->getServiceLocator()
-            ->get('VuFind\SearchResultsPluginManager')->get('Solr');
+        $searchObject = $this->serviceLocator
+            ->get('VuFind\Search\Results\PluginManager')->get('Solr');
         foreach ($appliedFilters as $filter) {
             $searchObject->getParams()->addFilter($filter);
         }
@@ -178,8 +183,7 @@ class CollectionsController extends AbstractBase
         $result = $searchObject->getFullFieldFacets(
             [$browseField], false, 150000, 'index'
         );
-        $result = isset($result[$browseField]['data']['list'])
-            ? $result[$browseField]['data']['list'] : [];
+        $result = $result[$browseField]['data']['list'] ?? [];
 
         $delimiter = $this->getBrowseDelimiter();
         foreach ($result as $rkey => $collection) {
@@ -261,7 +265,7 @@ class CollectionsController extends AbstractBase
         }
         $result = $sorted;
 
-        return isset($key) ? $key : 0;
+        return $key ?? 0;
     }
 
     /**
@@ -333,7 +337,7 @@ class CollectionsController extends AbstractBase
     {
         $title = addcslashes($title, '"');
         $query = new Query("is_hierarchy_title:\"$title\"", 'AllFields');
-        $searchService = $this->getServiceLocator()->get('VuFind\Search');
+        $searchService = $this->serviceLocator->get('VuFindSearch\Service');
         $result = $searchService->search('Solr', $query, 0, $this->getBrowseLimit());
         return $result->getRecords();
     }

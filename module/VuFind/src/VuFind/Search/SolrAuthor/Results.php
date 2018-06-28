@@ -2,7 +2,7 @@
 /**
  * Author aspect of the Search Multi-class (Results)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +26,10 @@
  * @link     https://vufind.org Main Site
  */
 namespace VuFind\Search\SolrAuthor;
+
+use VuFind\Record\Loader;
 use VuFind\Search\Solr\Results as SolrResults;
+use VuFindSearch\Service as SearchService;
 
 /**
  * Author Search Options
@@ -42,13 +45,15 @@ class Results extends SolrResults
     /**
      * Constructor
      *
-     * @param \VuFind\Search\Base\Params $params Object representing user search
-     * parameters.
+     * @param \VuFind\Search\Base\Params $params        Object representing user
+     * search parameters.
+     * @param SearchService              $searchService Search service
+     * @param Loader                     $recordLoader  Record loader
      */
-    public function __construct($params)
-    {
-        // Call parent constructor:
-        parent::__construct($params);
+    public function __construct(\VuFind\Search\Base\Params $params,
+        SearchService $searchService, Loader $recordLoader
+    ) {
+        parent::__construct($params, $searchService, $recordLoader);
     }
 
     /**

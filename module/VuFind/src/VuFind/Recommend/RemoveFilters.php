@@ -3,7 +3,7 @@
  * RemoveFilters Recommendations Module
  * Recommends to remove filters
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -112,7 +112,7 @@ class RemoveFilters implements RecommendInterface
      */
     public function hasFilters()
     {
-        return ($this->activeFacetsCount > 0);
+        return $this->activeFacetsCount > 0;
     }
 
     /**

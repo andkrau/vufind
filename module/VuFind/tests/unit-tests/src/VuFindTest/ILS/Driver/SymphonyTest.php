@@ -2,7 +2,7 @@
 /**
  * ILS driver test
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -26,6 +26,7 @@
  * @link     https://vufind.org Main Page
  */
 namespace VuFindTest\ILS\Driver;
+
 use VuFind\ILS\Driver\Symphony;
 
 /**
@@ -39,14 +40,24 @@ use VuFind\ILS\Driver\Symphony;
  */
 class SymphonyTest extends \VuFindTest\Unit\TestCase
 {
+    /**
+     * Driver object
+     *
+     * @var Symphony
+     */
     protected $driver;
 
     /**
-     * Constructor
+     * Standard setup method.
+     *
+     * @return void
      */
-    public function __construct()
+    public function setUp()
     {
-        $this->driver = new Symphony();
+        $loader = $this->getMockBuilder('VuFind\Record\Loader')
+            ->disableOriginalConstructor()->getMock();
+
+        $this->driver = new Symphony($loader);
     }
 
     /**
@@ -56,10 +67,6 @@ class SymphonyTest extends \VuFindTest\Unit\TestCase
      */
     public function testBadBaseUrl()
     {
-        if (!version_compare(\PHP_VERSION, '5.3.4', '>=')) {
-            $this->markTestSkipped('Test requires PHP >= 5.3.4 (see VUFIND-660)');
-        }
-
         // Without SOAP functionality, we can't proceed:
         if (!class_exists('SoapClient')) {
             $this->markTestSkipped('SoapClient not installed');

@@ -2,7 +2,7 @@
 /**
  * Author Search Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -38,6 +38,21 @@ namespace VuFind\Controller;
  */
 class AuthorController extends AbstractSearch
 {
+    /**
+     * Returns a list of all items associated with one facet for the lightbox
+     *
+     * Parameters:
+     * facet        The facet to retrieve
+     * searchParams Facet search params from $results->getUrlQuery()->getParams()
+     *
+     * @return mixed
+     */
+    public function facetListAction()
+    {
+        $this->searchClassId = 'SolrAuthor';
+        return parent::facetListAction();
+    }
+
     /**
      * Sets the configuration for displaying author results
      *
@@ -80,10 +95,8 @@ class AuthorController extends AbstractSearch
         // If an author was requested, forward to the results page; otherwise,
         // display the search form:
         $author = $this->params()->fromQuery('author');
-        if (!empty($author)) {
-            return $this->forwardTo('Author', 'Results');
-        }
-        return $this->createViewModel();
+        return !empty($author)
+            ? $this->forwardTo('Author', 'Results') : parent::homeAction();
     }
 
     /**
@@ -93,8 +106,9 @@ class AuthorController extends AbstractSearch
      */
     protected function resultScrollerActive()
     {
-        $config = $this->getServiceLocator()->get('VuFind\Config')->get('config');
-        return (isset($config->Record->next_prev_navigation)
-            && $config->Record->next_prev_navigation);
+        $config = $this->serviceLocator->get('VuFind\Config\PluginManager')
+            ->get('config');
+        return isset($config->Record->next_prev_navigation)
+            && $config->Record->next_prev_navigation;
     }
 }

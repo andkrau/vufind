@@ -2,7 +2,7 @@
 /**
  * Record driver plugin manager
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +26,6 @@
  * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
 namespace VuFind\RecordDriver;
-use Zend\ServiceManager\ConfigInterface;
 
 /**
  * Record driver plugin manager
@@ -40,28 +39,100 @@ use Zend\ServiceManager\ConfigInterface;
 class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
 {
     /**
+     * Default plugin aliases.
+     *
+     * @var array
+     */
+    protected $aliases = [
+        'browzine' => 'VuFind\RecordDriver\BrowZine',
+        'eds' => 'VuFind\RecordDriver\EDS',
+        'eit' => 'VuFind\RecordDriver\EIT',
+        'libguides' => 'VuFind\RecordDriver\LibGuides',
+        'missing' => 'VuFind\RecordDriver\Missing',
+        'pazpar2' => 'VuFind\RecordDriver\Pazpar2',
+        'primo' => 'VuFind\RecordDriver\Primo',
+        'solrauth' => 'VuFind\RecordDriver\SolrAuth',
+        'solrdefault' => 'VuFind\RecordDriver\SolrDefault',
+        'solrmarc' => 'VuFind\RecordDriver\SolrMarc',
+        'solrmarcremote' => 'VuFind\RecordDriver\SolrMarcRemote',
+        'solrreserves' => 'VuFind\RecordDriver\SolrReserves',
+        'solrweb' => 'VuFind\RecordDriver\SolrWeb',
+        'summon' => 'VuFind\RecordDriver\Summon',
+        'worldcat' => 'VuFind\RecordDriver\WorldCat',
+    ];
+
+    /**
+     * Default delegator factories.
+     *
+     * @var string[][]|\Zend\ServiceManager\Factory\DelegatorFactoryInterface[][]
+     */
+    protected $delegators = [
+        'VuFind\RecordDriver\SolrMarc' =>
+            ['VuFind\RecordDriver\IlsAwareDelegatorFactory'],
+        'VuFind\RecordDriver\SolrMarcRemote' =>
+            ['VuFind\RecordDriver\IlsAwareDelegatorFactory'],
+    ];
+
+    /**
+     * Default plugin factories.
+     *
+     * @var array
+     */
+    protected $factories = [
+        'VuFind\RecordDriver\BrowZine' =>
+            'Zend\ServiceManager\Factory\InvokableFactory',
+        'VuFind\RecordDriver\EDS' => 'VuFind\RecordDriver\NameBasedConfigFactory',
+        'VuFind\RecordDriver\EIT' => 'VuFind\RecordDriver\NameBasedConfigFactory',
+        'VuFind\RecordDriver\LibGuides' =>
+            'Zend\ServiceManager\Factory\InvokableFactory',
+        'VuFind\RecordDriver\Missing' => 'VuFind\RecordDriver\AbstractBaseFactory',
+        'VuFind\RecordDriver\Pazpar2' =>
+            'VuFind\RecordDriver\NameBasedConfigFactory',
+        'VuFind\RecordDriver\Primo' => 'VuFind\RecordDriver\NameBasedConfigFactory',
+        'VuFind\RecordDriver\SolrAuth' =>
+            'VuFind\RecordDriver\SolrDefaultWithoutSearchServiceFactory',
+        'VuFind\RecordDriver\SolrDefault' =>
+            'VuFind\RecordDriver\SolrDefaultFactory',
+        'VuFind\RecordDriver\SolrMarc' => 'VuFind\RecordDriver\SolrDefaultFactory',
+        'VuFind\RecordDriver\SolrMarcRemote' =>
+            'VuFind\RecordDriver\SolrDefaultFactory',
+        'VuFind\RecordDriver\SolrReserves' =>
+            'VuFind\RecordDriver\SolrDefaultWithoutSearchServiceFactory',
+        'VuFind\RecordDriver\SolrWeb' => 'VuFind\RecordDriver\SolrWebFactory',
+        'VuFind\RecordDriver\Summon' => 'VuFind\RecordDriver\SummonFactory',
+        'VuFind\RecordDriver\WorldCat' =>
+            'VuFind\RecordDriver\NameBasedConfigFactory',
+    ];
+
+    /**
      * Constructor
      *
-     * @param ConfigInterface $configuration Configuration settings (optional)
+     * Make sure plugins are properly initialized.
+     *
+     * @param mixed $configOrContainerInstance Configuration or container instance
+     * @param array $v3config                  If $configOrContainerInstance is a
+     * container, this value will be passed to the parent constructor.
      */
-    public function __construct(ConfigInterface $configuration = null)
-    {
-        // Record drivers are not meant to be shared -- every time we retrieve one,
+    public function __construct($configOrContainerInstance = null,
+        array $v3config = []
+    ) {
+        // These objects are not meant to be shared -- every time we retrieve one,
         // we are building a brand new object.
-        $this->setShareByDefault(false);
+        $this->sharedByDefault = false;
 
-        parent::__construct($configuration);
+        $this->addAbstractFactory('VuFind\RecordDriver\PluginFactory');
+
+        parent::__construct($configOrContainerInstance, $v3config);
 
         // Add an initializer for setting up hierarchies
-        $initializer = function ($instance, $manager) {
+        $initializer = function ($sm, $instance) {
             $hasHierarchyType = is_callable([$instance, 'getHierarchyType']);
             if ($hasHierarchyType
                 && is_callable([$instance, 'setHierarchyDriverManager'])
             ) {
-                $sm = $manager->getServiceLocator();
-                if ($sm && $sm->has('VuFind\HierarchyDriverPluginManager')) {
+                if ($sm && $sm->has('VuFind\Hierarchy\Driver\PluginManager')) {
                     $instance->setHierarchyDriverManager(
-                        $sm->get('VuFind\HierarchyDriverPluginManager')
+                        $sm->get('VuFind\Hierarchy\Driver\PluginManager')
                     );
                 }
             }

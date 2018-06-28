@@ -2,7 +2,7 @@
 /**
  * MyResearch Controller
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -27,13 +27,14 @@
  */
 namespace VuFind\Controller;
 
-use VuFind\Exception\Auth as AuthException,
-    VuFind\Exception\Forbidden as ForbiddenException,
-    VuFind\Exception\Mail as MailException,
-    VuFind\Exception\ListPermission as ListPermissionException,
-    VuFind\Exception\RecordMissing as RecordMissingException,
-    VuFind\Search\RecommendListener, Zend\Stdlib\Parameters,
-    Zend\View\Model\ViewModel;
+use VuFind\Exception\Auth as AuthException;
+use VuFind\Exception\Forbidden as ForbiddenException;
+use VuFind\Exception\ILS as ILSException;
+use VuFind\Exception\ListPermission as ListPermissionException;
+use VuFind\Exception\Mail as MailException;
+use VuFind\Search\RecommendListener;
+use Zend\Stdlib\Parameters;
+use Zend\View\Model\ViewModel;
 
 /**
  * Controller for the user account area.
@@ -46,6 +47,30 @@ use VuFind\Exception\Auth as AuthException,
  */
 class MyResearchController extends AbstractBase
 {
+    /**
+     * Are we currently in a lightbox context?
+     *
+     * @return bool
+     */
+    protected function inLightbox()
+    {
+        return $this->getRequest()->getQuery('layout', 'no') === 'lightbox'
+            || 'layout/lightbox' == $this->layout()->getTemplate();
+    }
+
+    /**
+     * Construct an HTTP 205 (refresh) response. Useful for reporting success
+     * in the lightbox without actually rendering content.
+     *
+     * @return \Zend\Http\Response
+     */
+    protected function getRefreshResponse()
+    {
+        $response = $this->getResponse();
+        $response->setStatusCode(205);
+        return $response;
+    }
+
     /**
      * Process an authentication error.
      *
@@ -80,6 +105,37 @@ class MyResearchController extends AbstractBase
     }
 
     /**
+     * Execute the request
+     *
+     * @param \Zend\Mvc\MvcEvent $event Event
+     *
+     * @return mixed
+     * @throws Exception\DomainException
+     */
+    public function onDispatch(\Zend\Mvc\MvcEvent $event)
+    {
+        // Catch any ILSExceptions thrown during processing and display a generic
+        // failure message to the user (instead of going to the fatal exception
+        // screen). This offers a slightly more forgiving experience when there is
+        // an unexpected ILS issue. Note that most ILS exceptions are handled at a
+        // lower level in the code (see \VuFind\ILS\Connection and the config.ini
+        // loadNoILSOnFailure setting), but there are some rare edge cases (for
+        // example, when the MultiBackend driver fails over to NoILS while used in
+        // combination with MultiILS authentication) that could lead here.
+        try {
+            return parent::onDispatch($event);
+        } catch (ILSException $exception) {
+            // Always display generic message:
+            $this->flashMessenger()->addErrorMessage('ils_connection_failed');
+            // In development mode, also show technical failure message:
+            if ('development' == APPLICATION_ENV) {
+                $this->flashMessenger()->addErrorMessage($exception->getMessage());
+            }
+            return $this->createViewModel();
+        }
+    }
+
+    /**
      * Prepare and direct the home page where it needs to go
      *
      * @return mixed
@@ -96,6 +152,14 @@ class MyResearchController extends AbstractBase
             try {
                 if (!$this->getAuthManager()->isLoggedIn()) {
                     $this->getAuthManager()->login($this->getRequest());
+                    // Return early to avoid unnecessary processing if we are being
+                    // called from login lightbox and don't have a followup action.
+                    if ($this->params()->fromPost('processLogin')
+                        && $this->inLightbox()
+                        && empty($this->getFollowupUrl())
+                    ) {
+                        return $this->getRefreshResponse();
+                    }
                 }
             } catch (AuthException $e) {
                 $this->processAuthenticationException($e);
@@ -104,7 +168,10 @@ class MyResearchController extends AbstractBase
 
         // Not logged in?  Force user to log in:
         if (!$this->getAuthManager()->isLoggedIn()) {
-            $this->setFollowupUrlToReferer();
+            // Allow bypassing of post-login redirect
+            if ($this->params()->fromQuery('redirect', true)) {
+                $this->setFollowupUrlToReferer();
+            }
             return $this->forwardTo('MyResearch', 'Login');
         }
         // Logged in?  Forward user to followup action
@@ -223,15 +290,9 @@ class MyResearchController extends AbstractBase
     {
         // Don't log in if already logged in!
         if ($this->getAuthManager()->isLoggedIn()) {
-            // inLightbox (only instance)
-            if ($this->getRequest()->getQuery('layout', 'no') === 'lightbox'
-                || 'layout/lightbox' == $this->layout()->getTemplate()
-            ) {
-                $response = $this->getResponse();
-                $response->setStatusCode(205);
-                return $response;
-            }
-            return $this->redirect()->toRoute('home');
+            return $this->inLightbox()  // different behavior for lightbox context
+                ? $this->getRefreshResponse()
+                : $this->redirect()->toRoute('home');
         }
         $this->clearFollowupUrl();
         $this->setFollowupUrlToReferer();
@@ -294,7 +355,7 @@ class MyResearchController extends AbstractBase
     protected function setSavedFlagSecurely($searchId, $saved, $userId)
     {
         $searchTable = $this->getTable('Search');
-        $sessId = $this->getServiceLocator()->get('VuFind\SessionManager')->getId();
+        $sessId = $this->serviceLocator->get('Zend\Session\SessionManager')->getId();
         $row = $searchTable->getOwnedRowById($searchId, $sessId, $userId);
         if (empty($row)) {
             throw new ForbiddenException('Access denied.');
@@ -312,7 +373,7 @@ class MyResearchController extends AbstractBase
     public function savesearchAction()
     {
         // Fail if saved searches are disabled.
-        $check = $this->getServiceLocator()->get('VuFind\AccountCapabilities');
+        $check = $this->serviceLocator->get('VuFind\Config\AccountCapabilities');
         if ($check->getSavedSearchSetting() === 'disabled') {
             throw new ForbiddenException('Saved searches disabled.');
         }
@@ -326,7 +387,7 @@ class MyResearchController extends AbstractBase
         if (($id = $this->params()->fromQuery('save', false)) !== false) {
             $this->setSavedFlagSecurely($id, true, $user->id);
             $this->flashMessenger()->addMessage('search_save_success', 'success');
-        } else if (($id = $this->params()->fromQuery('delete', false)) !== false) {
+        } elseif (($id = $this->params()->fromQuery('delete', false)) !== false) {
             $this->setSavedFlagSecurely($id, false, $user->id);
             $this->flashMessenger()->addMessage('search_unsave_success', 'success');
         } else {
@@ -351,45 +412,51 @@ class MyResearchController extends AbstractBase
      */
     public function profileAction()
     {
-        // Stop now if the user does not have valid catalog credentials available:
-        if (!is_array($patron = $this->catalogLogin())) {
-            return $patron;
-        }
-
-        // User must be logged in at this point, so we can assume this is non-false:
-        $user = $this->getUser();
-
-        // Process home library parameter (if present):
-        $homeLibrary = $this->params()->fromPost('home_library', false);
-        if (!empty($homeLibrary)) {
-            $user->changeHomeLibrary($homeLibrary);
-            $this->getAuthManager()->updateSession($user);
-            $this->flashMessenger()->addMessage('profile_update', 'success');
+        if (!($user = $this->getUser())) {
+            return $this->forceLogin();
         }
 
         // Begin building view object:
-        $view = $this->createViewModel();
+        $view = $this->createViewModel(['user' => $user]);
 
-        // Obtain user information from ILS:
-        $catalog = $this->getILS();
-        $this->addAccountBlocksToFlashMessenger($catalog, $patron);
-        $profile = $catalog->getMyProfile($patron);
-        $profile['home_library'] = $user->home_library;
-        $view->profile = $profile;
-        try {
-            $view->pickup = $catalog->getPickUpLocations($patron);
-            $view->defaultPickupLocation
-                = $catalog->getDefaultPickUpLocation($patron);
-        } catch (\Exception $e) {
-            // Do nothing; if we're unable to load information about pickup
-            // locations, they are not supported and we should ignore them.
+        $patron = $this->catalogLogin();
+        if (is_array($patron)) {
+            // Process home library parameter (if present):
+            $homeLibrary = $this->params()->fromPost('home_library', false);
+            if (!empty($homeLibrary)) {
+                $user->changeHomeLibrary($homeLibrary);
+                $this->getAuthManager()->updateSession($user);
+                $this->flashMessenger()->addMessage('profile_update', 'success');
+            }
+
+            // Obtain user information from ILS:
+            $catalog = $this->getILS();
+            $this->addAccountBlocksToFlashMessenger($catalog, $patron);
+            $profile = $catalog->getMyProfile($patron);
+            $profile['home_library'] = $user->home_library;
+            $view->profile = $profile;
+            try {
+                $view->pickup = $catalog->getPickUpLocations($patron);
+                $view->defaultPickupLocation
+                    = $catalog->getDefaultPickUpLocation($patron);
+            } catch (\Exception $e) {
+                // Do nothing; if we're unable to load information about pickup
+                // locations, they are not supported and we should ignore them.
+            }
+        } else {
+            $view->patronLoginView = $patron;
         }
+
+        $config = $this->getConfig();
+        $view->accountDeletion
+            = !empty($config->Authentication->account_deletion);
 
         return $view;
     }
 
     /**
      * Add account blocks to the flash messenger as errors.
+     * These messages are lightbox ignored.
      *
      * @param \VuFind\ILS\Connection $catalog Catalog connection
      * @param array                  $patron  Patron details
@@ -402,7 +469,10 @@ class MyResearchController extends AbstractBase
             && $blocks = $catalog->getAccountBlocks($patron)
         ) {
             foreach ($blocks as $block) {
-                $this->flashMessenger()->addMessage($block, 'error');
+                $this->flashMessenger()->addMessage(
+                    [ 'msg' => $block, 'dataset' => [ 'lightbox-ignore' => '1' ] ],
+                    'error'
+                );
             }
         }
     }
@@ -430,6 +500,12 @@ class MyResearchController extends AbstractBase
      */
     public function favoritesAction()
     {
+        // Check permission:
+        $response = $this->permission()->check('feature.Favorites', false);
+        if (is_object($response)) {
+            return $response;
+        }
+
         // Favorites is the same as MyList, but without the list ID parameter.
         return $this->forwardTo('MyResearch', 'MyList');
     }
@@ -454,7 +530,7 @@ class MyResearchController extends AbstractBase
             : $this->url()->fromRoute('userList', ['id' => $listID]);
 
         // Fail if we have nothing to delete:
-        $ids = is_null($this->params()->fromPost('selectAll'))
+        $ids = null === $this->params()->fromPost('selectAll')
             ? $this->params()->fromPost('ids')
             : $this->params()->fromPost('idsAll');
         if (!is_array($ids) || empty($ids)) {
@@ -540,26 +616,28 @@ class MyResearchController extends AbstractBase
     protected function processEditSubmit($user, $driver, $listID)
     {
         $lists = $this->params()->fromPost('lists');
-        $tagParser = $this->getServiceLocator()->get('VuFind\Tags');
+        $tagParser = $this->serviceLocator->get('VuFind\Tags');
+        $favorites = $this->serviceLocator
+            ->get('VuFind\Favorites\FavoritesService');
         foreach ($lists as $list) {
             $tags = $this->params()->fromPost('tags' . $list);
-            $driver->saveToFavorites(
+            $favorites->save(
                 [
                     'list'  => $list,
                     'mytags'  => $tagParser->parse($tags),
                     'notes' => $this->params()->fromPost('notes' . $list)
                 ],
-                $user
+                $user, $driver
             );
         }
         // add to a new list?
         $addToList = $this->params()->fromPost('addToList');
         if ($addToList > -1) {
-            $driver->saveToFavorites(['list' => $addToList], $user);
+            $favorites->save(['list' => $addToList], $user, $driver);
         }
         $this->flashMessenger()->addMessage('edit_list_success', 'success');
 
-        $newUrl = is_null($listID)
+        $newUrl = null === $listID
             ? $this->url()->fromRoute('myresearch-favorites')
             : $this->url()->fromRoute('userList', ['id' => $listID]);
         return $this->redirect()->toUrl($newUrl);
@@ -695,7 +773,7 @@ class MyResearchController extends AbstractBase
 
         // If we got this far, we just need to display the favorites:
         try {
-            $runner = $this->getServiceLocator()->get('VuFind\SearchRunner');
+            $runner = $this->serviceLocator->get('VuFind\Search\SearchRunner');
 
             // We want to merge together GET, POST and route parameters to
             // initialize our search object:
@@ -704,8 +782,8 @@ class MyResearchController extends AbstractBase
                 + ['id' => $this->params()->fromRoute('id')];
 
             // Set up listener for recommendations:
-            $rManager = $this->getServiceLocator()
-                ->get('VuFind\RecommendPluginManager');
+            $rManager = $this->serviceLocator
+                ->get('VuFind\Recommend\PluginManager');
             $setupCallback = function ($runner, $params, $searchId) use ($rManager) {
                 $listener = new RecommendListener($rManager, $searchId);
                 $listener->setConfig(
@@ -775,7 +853,7 @@ class MyResearchController extends AbstractBase
 
             return $this->redirect()->toRoute('userList', ['id' => $finalId]);
         } catch (\Exception $e) {
-            switch(get_class($e)) {
+            switch (get_class($e)) {
             case 'VuFind\Exception\ListPermission':
             case 'VuFind\Exception\MissingField':
                 $this->flashMessenger()->addMessage($e->getMessage(), 'error');
@@ -858,7 +936,7 @@ class MyResearchController extends AbstractBase
                 // Success Message
                 $this->flashMessenger()->addMessage('fav_list_delete', 'success');
             } catch (\Exception $e) {
-                switch(get_class($e)) {
+                switch (get_class($e)) {
                 case 'VuFind\Exception\LoginRequired':
                 case 'VuFind\Exception\ListPermission':
                     $user = $this->getUser();
@@ -893,10 +971,9 @@ class MyResearchController extends AbstractBase
      */
     protected function getDriverForILSRecord($current)
     {
-        $id = isset($current['id']) ? $current['id'] : null;
-        $source = isset($current['source'])
-            ? $current['source'] : DEFAULT_SEARCH_BACKEND;
-        $record = $this->getServiceLocator()->get('VuFind\RecordLoader')
+        $id = $current['id'] ?? '';
+        $source = $current['source'] ?? DEFAULT_SEARCH_BACKEND;
+        $record = $this->serviceLocator->get('VuFind\Record\Loader')
             ->load($id, $source, true);
         $record->setExtraDetail('ils_details', $current);
         return $record;
@@ -1156,10 +1233,138 @@ class MyResearchController extends AbstractBase
             }
         }
 
+        $displayItemBarcode
+            = !empty($config->Catalog->display_checked_out_item_barcode);
+
         return $this->createViewModel(
             compact(
                 'transactions', 'renewForm', 'renewResult', 'paginator',
-                'hiddenTransactions'
+                'hiddenTransactions', 'displayItemBarcode'
+            )
+        );
+    }
+
+    /**
+     * Send list of historic loans to view
+     *
+     * @return mixed
+     */
+    public function historicloansAction()
+    {
+        // Stop now if the user does not have valid catalog credentials available:
+        if (!is_array($patron = $this->catalogLogin())) {
+            return $patron;
+        }
+
+        // Connect to the ILS:
+        $catalog = $this->getILS();
+
+        // Check function config
+        $functionConfig = $catalog->checkFunction(
+            'getMyTransactionHistory', $patron
+        );
+        if (false === $functionConfig) {
+            $this->flashMessenger()->addErrorMessage('ils_action_unavailable');
+            return $this->createViewModel();
+        }
+
+        // Get page and page size:
+        $page = (int)$this->params()->fromQuery('page', 1);
+        $config = $this->getConfig();
+        $limit = isset($config->Catalog->historic_loan_page_size)
+            ? $config->Catalog->historic_loan_page_size : 50;
+        $ilsPaging = true;
+        if (isset($functionConfig['max_results'])) {
+            $limit = min([$functionConfig['max_results'], $limit]);
+        } elseif (isset($functionConfig['page_size'])) {
+            if (!in_array($limit, $functionConfig['page_size'])) {
+                $limit = $functionConfig['default_page_size']
+                    ?? $functionConfig['page_size'][0];
+            }
+        } else {
+            $ilsPaging = false;
+        }
+
+        // Get sort settings
+        $sort = false;
+        if (!empty($functionConfig['sort'])) {
+            $sort = $this->params()->fromQuery('sort');
+            if (!isset($functionConfig['sort'][$sort])) {
+                if (isset($functionConfig['default_sort'])) {
+                    $sort = $functionConfig['default_sort'];
+                } else {
+                    reset($functionConfig['sort']);
+                    $sort = key($functionConfig['sort']);
+                }
+            }
+        }
+
+        // Configure call params
+        $params = [
+            'sort' => $sort
+        ];
+        if ($ilsPaging) {
+            $params['page'] = $page;
+            $params['limit'] = $limit;
+        }
+
+        // Get checked out item details:
+        $result = $catalog->getMyTransactionHistory($patron, $params);
+
+        if (isset($result['success']) && !$result['success']) {
+            $this->flashMessenger()->addErrorMessage($result['status']);
+            return $this->createViewModel();
+        }
+
+        // Build paginator if needed:
+        if ($ilsPaging && $limit < $result['count']) {
+            $adapter = new \Zend\Paginator\Adapter\NullFill($result['count']);
+            $paginator = new \Zend\Paginator\Paginator($adapter);
+            $paginator->setItemCountPerPage($limit);
+            $paginator->setCurrentPageNumber($page);
+            $pageStart = $paginator->getAbsoluteItemNumber(1) - 1;
+            $pageEnd = $paginator->getAbsoluteItemNumber($limit) - 1;
+        } elseif ($limit > 0 && $limit < $result['count']) {
+            $adapter = new \Zend\Paginator\Adapter\ArrayAdapter(
+                $result['transactions']
+            );
+            $paginator = new \Zend\Paginator\Paginator($adapter);
+            $paginator->setItemCountPerPage($limit);
+            $paginator->setCurrentPageNumber($page);
+            $pageStart = $paginator->getAbsoluteItemNumber(1) - 1;
+            $pageEnd = $paginator->getAbsoluteItemNumber($limit) - 1;
+        } else {
+            $paginator = false;
+            $pageStart = 0;
+            $pageEnd = $result['count'];
+        }
+
+        $transactions = $hiddenTransactions = [];
+        foreach ($result['transactions'] as $i => $current) {
+            // Build record driver (only for the current visible page):
+            if ($ilsPaging || ($i >= $pageStart && $i <= $pageEnd)) {
+                $transactions[] = $this->getDriverForILSRecord($current);
+            } else {
+                $hiddenTransactions[] = $current;
+            }
+        }
+
+        // Handle view params for sorting
+        $sortList = [];
+        if (!empty($functionConfig['sort'])) {
+            foreach ($functionConfig['sort'] as $key => $value) {
+                $sortList[$key] = [
+                    'desc' => $value,
+                    'url' => '?sort=' . urlencode($key),
+                    'selected' => $sort == $key
+                ];
+            }
+        }
+
+        return $this->createViewModel(
+            compact(
+                'transactions', 'paginator', 'params',
+                'hiddenTransactions', 'sortList', 'functionConfig'
             )
         );
     }
@@ -1185,18 +1390,20 @@ class MyResearchController extends AbstractBase
         foreach ($result as $row) {
             // Attempt to look up and inject title:
             try {
-                if (!isset($row['id']) || empty($row['id'])) {
-                    throw new \Exception();
+                if (strlen($row['id'] ?? '') > 0) {
+                    $source = $row['source'] ?? DEFAULT_SEARCH_BACKEND;
+                    $row['driver'] = $this->serviceLocator
+                        ->get('VuFind\Record\Loader')->load($row['id'], $source);
+                    if (empty($row['title'])) {
+                        $row['title'] = $row['driver']->getShortTitle();
+                    }
                 }
-                $source = isset($row['source'])
-                    ? $row['source'] : DEFAULT_SEARCH_BACKEND;
-                $row['driver'] = $this->getServiceLocator()
-                    ->get('VuFind\RecordLoader')->load($row['id'], $source);
-                $row['title'] = $row['driver']->getShortTitle();
             } catch (\Exception $e) {
-                if (!isset($row['title'])) {
-                    $row['title'] = null;
-                }
+                // Ignore record loading exceptions...
+            }
+            // In case we skipped or failed record loading, make sure title is set.
+            if (!isset($row['title'])) {
+                $row['title'] = null;
             }
             $fines[] = $row;
         }
@@ -1295,7 +1502,7 @@ class MyResearchController extends AbstractBase
                                 . $user->verify_hash . '&auth_method=' . $method
                         ]
                     );
-                    $this->getServiceLocator()->get('VuFind\Mailer')->send(
+                    $this->serviceLocator->get('VuFind\Mailer\Mailer')->send(
                         $user->email,
                         $config->Site->email,
                         $this->translate('recovery_email_subject'),
@@ -1503,5 +1710,46 @@ class MyResearchController extends AbstractBase
         if (!empty($method)) {
             $this->getAuthManager()->setAuthMethod($method);
         }
+    }
+
+    /**
+     * Account deletion
+     *
+     * @return mixed
+     */
+    public function deleteAccountAction()
+    {
+        // Force login:
+        if (!($user = $this->getUser())) {
+            return $this->forceLogin();
+        }
+
+        $config = $this->getConfig();
+        if (empty($config->Authentication->account_deletion)) {
+            throw new \VuFind\Exception\BadRequest();
+        }
+
+        $view = $this->createViewModel(['accountDeleted' => false]);
+        if ($this->formWasSubmitted('submit')) {
+            $csrf = $this->serviceLocator->get('VuFind\Validator\Csrf');
+            if (!$csrf->isValid($this->getRequest()->getPost()->get('csrf'))) {
+                throw new \VuFind\Exception\BadRequest(
+                    'error_inconsistent_parameters'
+                );
+            } else {
+                // After successful token verification, clear list to shrink session:
+                $this->csrf->trimTokenList(0);
+            }
+            $user->delete(
+                $config->Authentication->delete_comments_with_user ?? true
+            );
+            $view->accountDeleted = true;
+            $view->redirectUrl = $this->getAuthManager()->logout(
+                $this->getServerUrl('home')
+            );
+        } elseif ($this->formWasSubmitted('reset')) {
+            return $this->redirect()->toRoute('myresearch-profile');
+        }
+        return $view;
     }
 }

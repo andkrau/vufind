@@ -2,7 +2,7 @@
 /**
  * Solr Web aspect of the Search Multi-class (Options)
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -69,6 +69,17 @@ class Options extends \VuFind\Search\Solr\Options
     {
         // Not currently supported:
         return false;
+    }
+
+    /**
+     * Return the route name for the facet list action. Returns false to cover
+     * unimplemented support.
+     *
+     * @return string|bool
+     */
+    public function getFacetListAction()
+    {
+        return 'web-facetlist';
     }
 
     /**

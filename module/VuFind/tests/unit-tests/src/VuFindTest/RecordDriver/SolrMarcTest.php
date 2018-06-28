@@ -2,7 +2,7 @@
 /**
  * SolrMarc Record Driver Test Class
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -91,6 +91,33 @@ class SolrMarcTest extends \VuFindTest\Unit\TestCase
             'Vico, Giambattista, 1668-1744. Works. 1982 ;', $series[0]['name']
         );
         $this->assertEquals('2, pt. 1.', $series[0]['number']);
+    }
+
+    /**
+     * Test regular and extended subject heading support.
+     *
+     * @return void
+     */
+    public function testSubjectHeadings()
+    {
+        $config = new \Zend\Config\Config([]);
+        $record = new \VuFind\RecordDriver\SolrMarc($config);
+        $fixture = $this->loadRecordFixture('testbug1.json');
+        $record->setRawData($fixture['response']['docs'][0]);
+        $this->assertEquals(
+            [['Matematica', 'Periodici.']],
+            $record->getAllSubjectHeadings()
+        );
+        $this->assertEquals(
+            [
+                [
+                    'heading' => ['Matematica', 'Periodici.'],
+                    'type' => '',
+                    'source' => ''
+                ],
+            ],
+            $record->getAllSubjectHeadings(true)
+        );
     }
 
     /**

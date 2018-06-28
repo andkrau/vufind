@@ -2,7 +2,11 @@
 /**
  * ILS support for MARC and other types of records.
  *
+<<<<<<< HEAD
  * PHP version 5
+=======
+ * PHP version 7
+>>>>>>> upstream/master
  *
  * Copyright (C) Villanova University 2010.
  * Copyright (C) The National Library of Finland 2015.
@@ -18,7 +22,11 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
+<<<<<<< HEAD
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+=======
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+>>>>>>> upstream/master
  *
  * @category VuFind
  * @package  RecordDrivers
@@ -49,18 +57,36 @@ trait IlsAwareTrait
     protected $ils = null;
 
     /**
+<<<<<<< HEAD
+=======
+     * Backends with ILS integration.
+     *
+     * @var string[]
+     */
+    protected $ilsBackends = [];
+
+    /**
+>>>>>>> upstream/master
      * Hold logic
      *
      * @var \VuFind\ILS\Logic\Holds
      */
+<<<<<<< HEAD
     protected $holdLogic;
+=======
+    protected $holdLogic = null;
+>>>>>>> upstream/master
 
     /**
      * Title hold logic
      *
      * @var \VuFind\ILS\Logic\TitleHolds
      */
+<<<<<<< HEAD
     protected $titleHoldLogic;
+=======
+    protected $titleHoldLogic = null;
+>>>>>>> upstream/master
 
     /**
      * Attach an ILS connection and related logic to the driver
@@ -87,7 +113,12 @@ trait IlsAwareTrait
      */
     protected function hasILS()
     {
+<<<<<<< HEAD
         return null !== $this->ils;
+=======
+        return null !== $this->ils
+            && in_array($this->getSourceIdentifier(), $this->ilsBackends);
+>>>>>>> upstream/master
     }
 
     /**
@@ -99,7 +130,11 @@ trait IlsAwareTrait
     public function getRealTimeHoldings()
     {
         return $this->hasILS() ? $this->holdLogic->getHoldings(
+<<<<<<< HEAD
             $this->getUniqueID(), $this->getConsortialIDs()
+=======
+            $this->getUniqueID(), $this->tryMethod('getConsortialIDs')
+>>>>>>> upstream/master
         ) : [];
     }
 
@@ -130,7 +165,11 @@ trait IlsAwareTrait
     public function getRealTimeTitleHold()
     {
         if ($this->hasILS()) {
+<<<<<<< HEAD
             $biblioLevel = strtolower($this->getBibliographicLevel());
+=======
+            $biblioLevel = strtolower($this->tryMethod('getBibliographicLevel'));
+>>>>>>> upstream/master
             if ("monograph" == $biblioLevel || strstr($biblioLevel, "part")) {
                 if ($this->ils->getTitleHoldsMode() != "disabled") {
                     return $this->titleHoldLogic->getHold($this->getUniqueID());
@@ -142,6 +181,21 @@ trait IlsAwareTrait
     }
 
     /**
+<<<<<<< HEAD
+=======
+     * Set the list of backends that support ILS integration.
+     *
+     * @param array $backends List of backends that support ILS integration
+     *
+     * @return string[]
+     */
+    public function setIlsBackends($backends)
+    {
+        $this->ilsBackends = $backends;
+    }
+
+    /**
+>>>>>>> upstream/master
      * Returns true if the record supports real-time AJAX status lookups.
      *
      * @return bool

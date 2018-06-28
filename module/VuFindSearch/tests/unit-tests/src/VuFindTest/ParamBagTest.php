@@ -3,7 +3,7 @@
 /**
  * Unit tests for ParamBag.
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -28,9 +28,9 @@
  */
 namespace VuFindTest;
 
-use VuFindSearch\ParamBag;
+use PHPUnit\Framework\TestCase;
 
-use PHPUnit_Framework_TestCase as TestCase;
+use VuFindSearch\ParamBag;
 
 /**
  * Unit tests for ParamBag.
@@ -43,6 +43,33 @@ use PHPUnit_Framework_TestCase as TestCase;
  */
 class ParamBagTest extends TestCase
 {
+    /**
+     * Test "contains"
+     *
+     * @return void
+     */
+    public function testContains()
+    {
+        $bag = new ParamBag();
+        $bag->set('foo', 'bar');
+        $this->assertTrue($bag->contains('foo', 'bar'));
+        $this->assertFalse($bag->contains('bar', 'foo'));
+        $this->assertFalse($bag->contains('foo', 'baz'));
+    }
+
+    /**
+     * Test "hasParam"
+     *
+     * @return void
+     */
+    public function testHasParam()
+    {
+        $bag = new ParamBag();
+        $bag->set('foo', 'bar');
+        $this->assertTrue($bag->hasParam('foo'));
+        $this->assertFalse($bag->hasParam('bar'));
+    }
+
     /**
      * Test "remove"
      *
@@ -69,5 +96,20 @@ class ParamBagTest extends TestCase
         $bag3 = new ParamBag(['c' => 3]);
         $bag3->mergeWithAll([$bag1, $bag2]);
         $this->assertEquals(['a' => [1], 'b' => [2], 'c' => [3]], $bag3->getArrayCopy());
+    }
+
+    /**
+     * Test countability.
+     *
+     * @return void
+     */
+    public function testCountability()
+    {
+        $bag = new ParamBag();
+        $this->assertEquals(0, count($bag));
+        $bag->set('foo', 'bar');
+        $this->assertEquals(1, count($bag));
+        $bag->set('xyzzy', 'baz');
+        $this->assertEquals(2, count($bag));
     }
 }

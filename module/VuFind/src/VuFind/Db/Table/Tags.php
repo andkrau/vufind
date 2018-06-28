@@ -2,7 +2,7 @@
 /**
  * Table Definition for tags
  *
- * PHP version 5
+ * PHP version 7
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,9 +26,12 @@
  * @link     https://vufind.org Main Site
  */
 namespace VuFind\Db\Table;
-use Zend\Db\Sql\Expression,
-    Zend\Db\Sql\Predicate\Predicate,
-    Zend\Db\Sql\Select;
+
+use VuFind\Db\Row\RowGateway;
+use Zend\Db\Adapter\Adapter;
+use Zend\Db\Sql\Expression;
+use Zend\Db\Sql\Predicate\Predicate;
+use Zend\Db\Sql\Select;
 
 /**
  * Table Definition for tags
@@ -51,12 +54,18 @@ class Tags extends Gateway
     /**
      * Constructor
      *
-     * @param bool $caseSensitive Are tags case sensitive?
+     * @param Adapter       $adapter       Database adapter
+     * @param PluginManager $tm            Table manager
+     * @param array         $cfg           Zend Framework configuration
+     * @param RowGateway    $rowObj        Row prototype object (null for default)
+     * @param bool          $caseSensitive Are tags case sensitive?
+     * @param string        $table         Name of database table to interface with
      */
-    public function __construct($caseSensitive = false)
-    {
-        parent::__construct('tags', 'VuFind\Db\Row\Tags');
+    public function __construct(Adapter $adapter, PluginManager $tm, $cfg,
+        RowGateway $rowObj = null, $caseSensitive = false, $table = 'tags'
+    ) {
         $this->caseSensitive = $caseSensitive;
+        parent::__construct($adapter, $tm, $cfg, $rowObj, $table);
     }
 
     /**
@@ -142,7 +151,7 @@ class Tags extends Gateway
             );
             if ($fuzzy) {
                 $select->where->literal('lower(tags.tag) like lower(?)', [$q]);
-            } else if (!$this->caseSensitive) {
+            } elseif (!$this->caseSensitive) {
                 $select->where->literal('lower(tags.tag) = lower(?)', [$q]);
             } else {
                 $select->where->equalTo('tags.tag', $q);
@@ -232,7 +241,7 @@ class Tags extends Gateway
 
                 if ($sort == 'count') {
                     $select->order(['cnt DESC', new Expression('lower(tags.tag)')]);
-                } else if ($sort == 'tag') {
+                } elseif ($sort == 'tag') {
                     $select->order([new Expression('lower(tags.tag)')]);
                 }
 
@@ -241,9 +250,9 @@ class Tags extends Gateway
                 }
                 if ($list === true) {
                     $select->where->isNotNull('rt.list_id');
-                } else if ($list === false) {
+                } elseif ($list === false) {
                     $select->where->isNull('rt.list_id');
-                } else if (null !== $list) {
+                } elseif (null !== $list) {
                     $select->where->equalTo('rt.list_id', $list);
                 }
                 if (null !== $user) {
@@ -263,12 +272,13 @@ class Tags extends Gateway
      * for no filter).
      * @param int    $listId     Filter for tags tied to a specific list (null for no
      * filter).
-     * @param string $source     Filter for tags tied to a specific record source.
+     * @param string $source     Filter for tags tied to a specific record source
+     * (null for no filter).
      *
      * @return \Zend\Db\ResultSet\AbstractResultSet
      */
     public function getForUser($userId, $resourceId = null, $listId = null,
-        $source = DEFAULT_SEARCH_BACKEND
+        $source = null
     ) {
         $callback = function ($select) use ($userId, $resourceId, $listId, $source) {
             $select->columns(
@@ -301,8 +311,11 @@ class Tags extends Gateway
                 ->equalTo(
                     'ur.list_id', 'rt.list_id',
                     Predicate::TYPE_IDENTIFIER, Predicate::TYPE_IDENTIFIER
-                )
-                ->equalTo('r.source', $source);
+                );
+
+            if (null !== $source) {
+                $select->where->equalTo('r.source', $source);
+            }
 
             if (null !== $resourceId) {
                 $select->where->equalTo('r.record_id', $resourceId);
